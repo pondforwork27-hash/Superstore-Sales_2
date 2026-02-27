@@ -681,6 +681,9 @@ with col1:
     most_orders_subcat = most_orders['Sub-Category']
     most_orders_count = most_orders['Order ID']
     
+    # Bottom performer
+    bottom_subcat = subcat_stats.iloc[-1]['Sub-Category']
+    
     st.markdown(f"""
     <div style="background: linear-gradient(135deg, #0d1b2a 0%, #1b2a3b 100%);
                 border: 1px solid #2d4a6b;
@@ -718,7 +721,7 @@ with col1:
         <div style="background: rgba(66,153,225,0.05); border-radius: 8px; padding: 15px; border-left: 4px solid #4299e1;">
             <div style="font-size: 0.8rem; color: #e2e8f0; line-height: 1.6;">
                 <strong>💡 Actionable Insight:</strong> Focus marketing efforts on <strong style="color: #90cdf4;">{top_subcat}</strong> as it generates the highest revenue. 
-                Consider bundling with lower-performing items like {subcat_stats.iloc[-1]['Sub-Category']} to boost their sales. 
+                Consider bundling with lower-performing items like {bottom_subcat} to boost their sales. 
                 The high average order value of <strong style="color: #90cdf4;">{highest_avg_subcat}</strong> suggests premium pricing opportunities.
             </div>
         </div>

@@ -690,7 +690,7 @@ with col2:
     
     fig_seg_corr.update_layout(
         title='Segment Sales Correlation<br><sup>How customer segments move together over time</sup>',
-        height=500,
+        height=400,
         xaxis_title='',
         yaxis_title=''
     )
@@ -707,6 +707,7 @@ with col2:
     strongest = corr_pairs[0] if corr_pairs else None
     weakest = corr_pairs[-1] if corr_pairs else None
     
+    # Insight cards
     col_a, col_b = st.columns(2)
     with col_a:
         if strongest:
@@ -729,6 +730,90 @@ with col2:
                 <div class="insight-detail">r = <strong>{weakest[2]:.3f}</strong> — These segments behave independently. Tailored strategies recommended.</div>
             </div>
             """, unsafe_allow_html=True)
+
+    # ADDITIONAL INSIGHT: Category Performance Analysis
+    st.markdown("### 📊 Category Performance Insights")
+    
+    # Calculate category metrics
+    cat_metrics = filtered_df.groupby('Category').agg({
+        'Sales': ['sum', 'mean'],
+        'Order ID': 'nunique',
+        'Sub-Category': 'nunique'
+    }).round(2)
+    
+    cat_metrics.columns = ['Total Sales', 'Avg Sale', 'Unique Orders', 'Unique Sub-Categories']
+    cat_metrics = cat_metrics.reset_index()
+    cat_metrics['Total Sales'] = cat_metrics['Total Sales'].apply(lambda x: f"${x:,.0f}")
+    cat_metrics['Avg Sale'] = cat_metrics['Avg Sale'].apply(lambda x: f"${x:,.2f}")
+    
+    # Display category metrics in a clean format
+    for _, row in cat_metrics.iterrows():
+        category = row['Category']
+        total_sales = row['Total Sales']
+        avg_sale = row['Avg Sale']
+        orders = f"{row['Unique Orders']:,}"
+        subcats = int(row['Unique Sub-Categories'])
+        
+        # Color coding based on category
+        if category == 'Technology':
+            icon = "💻"
+            color = "#4299e1"
+        elif category == 'Furniture':
+            icon = "🪑"
+            color = "#48bb78"
+        else:  # Office Supplies
+            icon = "📎"
+            color = "#ed8936"
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #0d1b2a 0%, #1b2a3b 100%);
+                    border-left: 4px solid {color};
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span style="font-size: 1.5rem;">{icon}</span>
+                <span style="font-size: 1.2rem; font-weight: 600; color: white;">{category}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <div style="font-size: 0.7rem; color: #a0aec0;">TOTAL SALES</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: white;">{total_sales}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.7rem; color: #a0aec0;">AVG SALE</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: white;">{avg_sale}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.7rem; color: #a0aec0;">ORDERS</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: white;">{orders}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.7rem; color: #a0aec0;">SUB-CATEGORIES</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: white;">{subcats}</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Find top and bottom performing sub-categories
+    top_subcat = subcat_sales.iloc[0]['Sub-Category']
+    top_subcat_sales = subcat_sales.iloc[0]['Sales']
+    bottom_subcat = subcat_sales.iloc[-1]['Sub-Category']
+    bottom_subcat_sales = subcat_sales.iloc[-1]['Sales']
+    
+    st.markdown(f"""
+    <div class="insight-card" style="margin-top: 10px;">
+        <div class="insight-icon">💡</div>
+        <div class="insight-label">Key Product Insight</div>
+        <div class="insight-value">{top_subcat}</div>
+        <div class="insight-detail">
+            <strong>Top performer:</strong> ${top_subcat_sales:,.0f} in sales<br>
+            <strong>Bottom performer:</strong> {bottom_subcat} (${bottom_subcat_sales:,.0f})<br>
+            <strong>Opportunity:</strong> The top sub-category generates {(top_subcat_sales/bottom_subcat_sales):.1f}x more sales than the bottom. Consider reviewing pricing, marketing, or inventory for underperformers.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -843,4 +928,5 @@ st.markdown("""
 <div style="text-align: center; color: #718096; font-size: 0.8rem; padding: 20px;">
     📊 Superstore Sales Analytics Dashboard • Built with Streamlit
 </div>
+
 """, unsafe_allow_html=True)

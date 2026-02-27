@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import pandas as st
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
@@ -664,26 +664,23 @@ with col1:
     )
     st.plotly_chart(fig_subcat_perf, use_container_width=True)
     
+    # Calculate insights
+    top_performer = subcat_stats.iloc[0]['Sub-Category']
+    top_sales = subcat_stats.iloc[0]['Sales']
+    top_orders = subcat_stats.iloc[0]['Order ID']
+    top_avg = subcat_stats.iloc[0]['Avg Order Value']
+    
+    highest_avg_row = subcat_stats.loc[subcat_stats['Avg Order Value'].idxmax()]
+    highest_avg_cat = highest_avg_row['Sub-Category']
+    highest_avg_val = highest_avg_row['Avg Order Value']
+    
+    most_orders_row = subcat_stats.loc[subcat_stats['Order ID'].idxmax()]
+    most_orders_cat = most_orders_row['Sub-Category']
+    most_orders_count = most_orders_row['Order ID']
+    
+    bottom_performer = subcat_stats.iloc[-1]['Sub-Category']
+    
     # INSIGHT UNDER SCATTER CHART
-    # Find top and bottom performing sub-categories
-    top_subcat = subcat_stats.iloc[0]['Sub-Category']
-    top_subcat_sales = subcat_stats.iloc[0]['Sales']
-    top_subcat_orders = subcat_stats.iloc[0]['Order ID']
-    top_subcat_avg = subcat_stats.iloc[0]['Avg Order Value']
-    
-    # Find highest average order value
-    highest_avg = subcat_stats.loc[subcat_stats['Avg Order Value'].idxmax()]
-    highest_avg_subcat = highest_avg['Sub-Category']
-    highest_avg_value = highest_avg['Avg Order Value']
-    
-    # Find most frequently ordered
-    most_orders = subcat_stats.loc[subcat_stats['Order ID'].idxmax()]
-    most_orders_subcat = most_orders['Sub-Category']
-    most_orders_count = most_orders['Order ID']
-    
-    # Bottom performer
-    bottom_subcat = subcat_stats.iloc[-1]['Sub-Category']
-    
     st.markdown(f"""
     <div style="background: linear-gradient(135deg, #0d1b2a 0%, #1b2a3b 100%);
                 border: 1px solid #2d4a6b;
@@ -698,31 +695,31 @@ with col1:
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
             <div style="background: rgba(66,153,225,0.1); border-radius: 8px; padding: 12px;">
                 <div style="font-size: 0.7rem; color: #a0aec0; margin-bottom: 4px;">🏆 TOP PERFORMER</div>
-                <div style="font-size: 1.2rem; font-weight: 600; color: white;">{top_subcat}</div>
-                <div style="font-size: 0.9rem; color: #90cdf4;">${top_subcat_sales:,.0f} total</div>
-                <div style="font-size: 0.8rem; color: #a0aec0;">{top_subcat_orders:,} orders • ${top_subcat_avg:,.2f} avg</div>
+                <div style="font-size: 1.2rem; font-weight: 600; color: white;">{top_performer}</div>
+                <div style="font-size: 0.9rem; color: #90cdf4;">${top_sales:,.0f} total</div>
+                <div style="font-size: 0.8rem; color: #a0aec0;">{top_orders:,} orders • ${top_avg:,.2f} avg</div>
             </div>
             
             <div style="background: rgba(72,187,120,0.1); border-radius: 8px; padding: 12px;">
                 <div style="font-size: 0.7rem; color: #a0aec0; margin-bottom: 4px;">💰 HIGHEST AVERAGE</div>
-                <div style="font-size: 1.2rem; font-weight: 600; color: white;">{highest_avg_subcat}</div>
-                <div style="font-size: 0.9rem; color: #90cdf4;">${highest_avg_value:,.2f} per order</div>
+                <div style="font-size: 1.2rem; font-weight: 600; color: white;">{highest_avg_cat}</div>
+                <div style="font-size: 0.9rem; color: #90cdf4;">${highest_avg_val:,.2f} per order</div>
                 <div style="font-size: 0.8rem; color: #a0aec0;">Premium priced items</div>
             </div>
         </div>
         
         <div style="background: rgba(237,137,54,0.1); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
             <div style="font-size: 0.7rem; color: #a0aec0; margin-bottom: 4px;">📦 MOST FREQUENT</div>
-            <div style="font-size: 1.2rem; font-weight: 600; color: white;">{most_orders_subcat}</div>
+            <div style="font-size: 1.2rem; font-weight: 600; color: white;">{most_orders_cat}</div>
             <div style="font-size: 0.9rem; color: #90cdf4;">{most_orders_count:,} orders</div>
             <div style="font-size: 0.8rem; color: #a0aec0;">High volume, fast-moving category</div>
         </div>
         
         <div style="background: rgba(66,153,225,0.05); border-radius: 8px; padding: 15px; border-left: 4px solid #4299e1;">
             <div style="font-size: 0.8rem; color: #e2e8f0; line-height: 1.6;">
-                <strong>💡 Actionable Insight:</strong> Focus marketing efforts on <strong style="color: #90cdf4;">{top_subcat}</strong> as it generates the highest revenue. 
-                Consider bundling with lower-performing items like {bottom_subcat} to boost their sales. 
-                The high average order value of <strong style="color: #90cdf4;">{highest_avg_subcat}</strong> suggests premium pricing opportunities.
+                <strong>💡 Actionable Insight:</strong> Focus marketing efforts on <strong style="color: #90cdf4;">{top_performer}</strong> as it generates the highest revenue. 
+                Consider bundling with lower-performing items like {bottom_performer} to boost their sales. 
+                The high average order value of <strong style="color: #90cdf4;">{highest_avg_cat}</strong> suggests premium pricing opportunities.
             </div>
         </div>
     </div>

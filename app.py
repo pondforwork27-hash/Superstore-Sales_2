@@ -227,7 +227,7 @@ if filtered_df.empty:
     st.stop()
 
 # ── Main Dashboard ─────────────────────────────────────────────────────────
-st.title("📊 Superstore Sales Analytics Dashboard")
+st.title("🛒 Superstore Sales Analytics Dashboard")
 st.markdown(f"*Analyzing {len(filtered_df):,} transactions from {filtered_df['Order Date'].min().strftime('%B %Y')} to {filtered_df['Order Date'].max().strftime('%B %Y')}*")
 
 # ── KPI Row ────────────────────────────────────────────────────────────────
@@ -839,4 +839,5 @@ st.markdown("""
     🛒 Superstore Sales Analytics Dashboard • Built with Streamlit
 </div>
 """, unsafe_allow_html=True)
+
 

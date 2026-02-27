@@ -618,120 +618,7 @@ st.header("📦 Product Analysis")
 col1, col2 = st.columns(2)
 
 with col1:
-    # Product sub-category performance scatter plot with correct hover formatting
-    subcat_stats = filtered_df.groupby('Sub-Category').agg({
-        'Sales': 'sum',
-        'Order ID': 'nunique'
-    }).reset_index()
-    subcat_stats['Avg Order Value'] = subcat_stats['Sales'] / subcat_stats['Order ID']
-    subcat_stats = subcat_stats.sort_values('Sales', ascending=False).head(15)
-    
-    # Create a simple scatter plot with correct hover formatting
-    fig_subcat_perf = px.scatter(
-        subcat_stats,
-        x='Order ID',
-        y='Sales',
-        size='Avg Order Value',
-        color='Sub-Category',
-        title='Sub-Category Performance (Top 15)',
-        hover_name='Sub-Category',
-        labels={
-            'Order ID': 'Number of Orders',
-            'Sales': 'Total Sales ($)',
-            'Avg Order Value': 'Average Order Value ($)'
-        },
-        size_max=30
-    )
-    
-    # Update hover template to show proper formatting with commas and 2 decimals
-    fig_subcat_perf.update_traces(
-        marker=dict(line=dict(width=1, color='white')),
-        hovertemplate='<b>%{hovertext}</b><br>' +
-                     'Sales: $%{y:,.2f}<br>' +
-                     'Orders: %{x:,.0f}<br>' +
-                     'Avg Order: $%{marker.size:,.2f}<extra></extra>'
-    )
-    
-    fig_subcat_perf.update_layout(
-        height=500,
-        xaxis_title='Number of Orders',
-        yaxis_title='Total Sales ($)',
-        hoverlabel=dict(
-            bgcolor='#0d1b2a',
-            font_size=12,
-            font_color='white'
-        )
-    )
-    st.plotly_chart(fig_subcat_perf, use_container_width=True)
-
-with col2:
-    # Segment Correlation Analysis
-    # Create monthly sales for each segment
-    monthly_segment = filtered_df.groupby(['Year', 'Month', 'Segment'])['Sales'].sum().reset_index()
-    monthly_segment['Date'] = pd.to_datetime(monthly_segment[['Year', 'Month']].assign(day=1))
-    
-    # Pivot for correlation
-    segment_pivot = monthly_segment.pivot(index='Date', columns='Segment', values='Sales').fillna(0)
-    segment_corr = segment_pivot.corr()
-    
-    # Create correlation heatmap
-    fig_seg_corr = go.Figure(data=go.Heatmap(
-        z=segment_corr.values,
-        x=segment_corr.columns,
-        y=segment_corr.index,
-        colorscale=[[0, '#0d1b2a'], [0.25, '#1e3a5f'], [0.5, '#2b6cb0'], [0.75, '#4299e1'], [1, '#90cdf4']],
-        zmin=0.5,
-        zmax=1.0,
-        text=[[f"{v:.3f}" for v in row] for row in segment_corr.values],
-        texttemplate='%{text}',
-        textfont=dict(size=14, color='white'),
-        hovertemplate='<b>%{y}</b> vs <b>%{x}</b><br>Correlation: %{z:.3f}<extra></extra>'
-    ))
-    
-    fig_seg_corr.update_layout(
-        title='Segment Sales Correlation<br><sup>How customer segments move together over time</sup>',
-        height=400,
-        xaxis_title='',
-        yaxis_title=''
-    )
-    st.plotly_chart(fig_seg_corr, use_container_width=True)
-    
-    # Find strongest and weakest correlations
-    segs = segment_corr.columns.tolist()
-    corr_pairs = []
-    for i in range(len(segs)):
-        for j in range(i+1, len(segs)):
-            corr_pairs.append((segs[i], segs[j], segment_corr.iloc[i, j]))
-    
-    corr_pairs.sort(key=lambda x: x[2], reverse=True)
-    strongest = corr_pairs[0] if corr_pairs else None
-    weakest = corr_pairs[-1] if corr_pairs else None
-    
-    # Insight cards
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if strongest:
-            st.markdown(f"""
-            <div class="insight-card good" style="margin-top: 10px;">
-                <div class="insight-icon">📈</div>
-                <div class="insight-label">Strongest Correlation</div>
-                <div class="insight-value">{strongest[0]} & {strongest[1]}</div>
-                <div class="insight-detail">r = <strong>{strongest[2]:.3f}</strong> — These segments move together. Campaigns that boost one will likely lift the other.</div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with col_b:
-        if weakest:
-            st.markdown(f"""
-            <div class="insight-card warn" style="margin-top: 10px;">
-                <div class="insight-icon">📉</div>
-                <div class="insight-label">Weakest Correlation</div>
-                <div class="insight-value">{weakest[0]} & {weakest[1]}</div>
-                <div class="insight-detail">r = <strong>{weakest[2]:.3f}</strong> — These segments behave independently. Tailored strategies recommended.</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # ADDITIONAL INSIGHT: Category Performance Analysis
+    # Category Performance Analysis (placed on left side)
     st.markdown("### 📊 Category Performance Insights")
     
     # Calculate category metrics
@@ -797,6 +684,8 @@ with col2:
         """, unsafe_allow_html=True)
     
     # Find top and bottom performing sub-categories
+    subcat_sales = filtered_df.groupby('Sub-Category')['Sales'].sum().reset_index()
+    subcat_sales = subcat_sales.sort_values('Sales', ascending=False)
     top_subcat = subcat_sales.iloc[0]['Sub-Category']
     top_subcat_sales = subcat_sales.iloc[0]['Sales']
     bottom_subcat = subcat_sales.iloc[-1]['Sub-Category']
@@ -815,8 +704,111 @@ with col2:
     </div>
     """, unsafe_allow_html=True)
 
+with col2:
+    # Product sub-category performance scatter plot with correct hover formatting
+    subcat_stats = filtered_df.groupby('Sub-Category').agg({
+        'Sales': 'sum',
+        'Order ID': 'nunique'
+    }).reset_index()
+    subcat_stats['Avg Order Value'] = subcat_stats['Sales'] / subcat_stats['Order ID']
+    subcat_stats = subcat_stats.sort_values('Sales', ascending=False).head(15)
+    
+    # Create a simple scatter plot with correct hover formatting
+    fig_subcat_perf = px.scatter(
+        subcat_stats,
+        x='Order ID',
+        y='Sales',
+        size='Avg Order Value',
+        color='Sub-Category',
+        title='Sub-Category Performance (Top 15)',
+        hover_name='Sub-Category',
+        labels={
+            'Order ID': 'Number of Orders',
+            'Sales': 'Total Sales ($)',
+            'Avg Order Value': 'Average Order Value ($)'
+        },
+        size_max=30
+    )
+    
+    # Update hover template to show proper formatting with commas and 2 decimals
+    fig_subcat_perf.update_traces(
+        marker=dict(line=dict(width=1, color='white')),
+        hovertemplate='<b>%{hovertext}</b><br>' +
+                     'Sales: $%{y:,.2f}<br>' +
+                     'Orders: %{x:,.0f}<br>' +
+                     'Avg Order: $%{marker.size:,.2f}<extra></extra>'
+    )
+    
+    fig_subcat_perf.update_layout(
+        height=600,
+        xaxis_title='Number of Orders',
+        yaxis_title='Total Sales ($)',
+        hoverlabel=dict(
+            bgcolor='#0d1b2a',
+            font_size=12,
+            font_color='white'
+        )
+    )
+    st.plotly_chart(fig_subcat_perf, use_container_width=True)
+
 st.markdown("---")
 
+# ── Regional Analysis ──────────────────────────────────────────────────────
+st.header("🌎 Regional Performance")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    # Region performance
+    region_stats = filtered_df.groupby('Region').agg({
+        'Sales': 'sum',
+        'Order ID': 'nunique',
+        'Customer ID': 'nunique'
+    }).reset_index()
+    
+    fig_region = px.bar(
+        region_stats,
+        x='Region',
+        y='Sales',
+        title='Sales by Region',
+        color='Sales',
+        color_continuous_scale='Blues'
+    )
+    fig_region.update_traces(
+        hovertemplate='<b>%{x}</b><br>Sales: $%{y:,.2f}<br>Orders: %{customdata[0]:,.0f}<br>Customers: %{customdata[1]:,.0f}<extra></extra>',
+        customdata=region_stats[['Order ID', 'Customer ID']]
+    )
+    fig_region.update_layout(
+        xaxis_title='',
+        yaxis_title='Sales ($)',
+        height=400,
+        coloraxis_showscale=False
+    )
+    st.plotly_chart(fig_region, use_container_width=True)
+
+with col2:
+    # Region vs Category
+    region_cat = filtered_df.groupby(['Region', 'Category'])['Sales'].sum().reset_index()
+    
+    fig_region_cat = px.bar(
+        region_cat,
+        x='Region',
+        y='Sales',
+        color='Category',
+        title='Sales by Region and Category',
+        barmode='group',
+        color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1']
+    )
+    fig_region_cat.update_traces(
+        hovertemplate='<b>%{x}</b><br>Category: %{fullData.name}<br>Sales: $%{y:,.2f}<extra></extra>'
+    )
+    fig_region_cat.update_layout(
+        xaxis_title='',
+        yaxis_title='Sales ($)',
+        height=400,
+        legend_title='Category'
+    )
+    st.plotly_chart(fig_region_cat, use_container_width=True)
 # ── Regional Analysis ──────────────────────────────────────────────────────
 st.header("🌎 Regional Performance")
 
@@ -930,3 +922,4 @@ st.markdown("""
 </div>
 
 """, unsafe_allow_html=True)
+

@@ -791,6 +791,9 @@ with col2:
                 <div style="font-size: 0.75rem; color: #a0aec0; margin-top: 5px;">Independent • Need tailored strategies</div>
             </div>
             """, unsafe_allow_html=True)
+
+st.markdown("---")
+
 # ── Regional Analysis ──────────────────────────────────────────────────────
 st.header("🌎 Regional Performance")
 
@@ -903,4 +906,3 @@ st.markdown("""
     📊 Superstore Sales Analytics Dashboard • Built with Streamlit
 </div>
 """, unsafe_allow_html=True)
-

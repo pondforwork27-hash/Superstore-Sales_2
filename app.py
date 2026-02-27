@@ -290,7 +290,6 @@ with tab1:
     col1, col2 = st.columns(2)
     
     with col1:
-        # Year-over-Year Monthly Comparison
         monthly_sales = filtered_df.groupby(['Year', 'Month'])['Sales'].sum().reset_index()
         monthly_sales['Date'] = pd.to_datetime(monthly_sales[['Year', 'Month']].assign(day=1))
         monthly_sales = monthly_sales.sort_values('Date')
@@ -314,15 +313,11 @@ with tab1:
             yaxis_title='Sales ($)',
             height=400,
             hovermode='x unified',
-            xaxis=dict(
-                tickformat='%b %Y',
-                tickangle=-45
-            )
+            xaxis=dict(tickformat='%b %Y', tickangle=-45)
         )
         st.plotly_chart(fig_monthly, use_container_width=True)
     
     with col2:
-        # Quarterly trend
         quarterly_sales = filtered_df.groupby(['Year', 'Quarter'])['Sales'].sum().reset_index()
         quarterly_sales['Quarter_Label'] = quarterly_sales['Year'].astype(str) + '-Q' + quarterly_sales['Quarter'].astype(str)
         quarterly_sales = quarterly_sales.sort_values(['Year', 'Quarter'])
@@ -351,7 +346,6 @@ with tab2:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        # Category distribution
         cat_sales = filtered_df.groupby('Category')['Sales'].sum().reset_index()
         
         fig_cat = px.pie(
@@ -371,7 +365,6 @@ with tab2:
         st.plotly_chart(fig_cat, use_container_width=True)
     
     with col2:
-        # Top sub-categories
         subcat_sales = filtered_df.groupby('Sub-Category')['Sales'].sum().reset_index()
         subcat_sales = subcat_sales.nlargest(10, 'Sales')
         
@@ -396,7 +389,6 @@ with tab2:
         st.plotly_chart(fig_subcat, use_container_width=True)
     
     with col3:
-        # Segment distribution
         seg_sales = filtered_df.groupby('Segment')['Sales'].sum().reset_index()
         
         fig_seg = px.bar(
@@ -422,7 +414,6 @@ with tab3:
     col1, col2 = st.columns(2)
     
     with col1:
-        # State-wise sales map
         state_sales = filtered_df.groupby(['State', 'State Code'])['Sales'].sum().reset_index()
         
         fig_map = px.choropleth(
@@ -447,7 +438,6 @@ with tab3:
         st.plotly_chart(fig_map, use_container_width=True)
     
     with col2:
-        # Top states bar chart
         top_states = state_sales.nlargest(10, 'Sales')
         
         fig_top_states = px.bar(
@@ -478,7 +468,6 @@ st.header("🚚 Shipping Performance")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    # Shipping mode distribution (by sales)
     ship_sales = filtered_df.groupby('Ship Mode')['Sales'].sum().reset_index()
     
     fig_ship = px.pie(
@@ -489,7 +478,7 @@ with col1:
         color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1', '#90cdf4']
     )
     fig_ship.update_traces(
-        textposition='inside', 
+        textposition='inside',
         textinfo='percent+label',
         hovertemplate='<b>%{label}</b><br>Sales: $%{value:,.2f}<br>Share: %{percent}<extra></extra>'
     )
@@ -497,7 +486,6 @@ with col1:
     st.plotly_chart(fig_ship, use_container_width=True)
 
 with col2:
-    # Average shipping days by ship mode
     ship_days = filtered_df.groupby('Ship Mode')['Shipping_Days'].mean().reset_index()
     ship_days = ship_days.sort_values('Shipping_Days', ascending=False)
     
@@ -521,7 +509,6 @@ with col2:
     st.plotly_chart(fig_ship_days, use_container_width=True)
 
 with col3:
-    # Order count by shipping mode
     ship_counts = filtered_df.groupby('Ship Mode')['Order ID'].nunique().reset_index()
     ship_counts.columns = ['Ship Mode', 'Order Count']
     ship_counts = ship_counts.sort_values('Order Count', ascending=False)
@@ -553,7 +540,6 @@ st.header("👥 Customer Insights")
 col1, col2 = st.columns(2)
 
 with col1:
-    # Top customers
     customer_sales = filtered_df.groupby('Customer Name').agg({
         'Sales': 'sum',
         'Order ID': 'nunique'
@@ -583,7 +569,6 @@ with col1:
     st.plotly_chart(fig_customers, use_container_width=True)
 
 with col2:
-    # Customer order frequency
     order_freq = filtered_df.groupby('Customer ID')['Order ID'].nunique().reset_index()
     order_freq.columns = ['Customer ID', 'Order Count']
     
@@ -618,7 +603,6 @@ st.header("📦 Product Analysis")
 col1, col2 = st.columns(2)
 
 with col1:
-    # Product sub-category performance scatter plot with correct hover formatting
     subcat_stats = filtered_df.groupby('Sub-Category').agg({
         'Sales': 'sum',
         'Order ID': 'nunique'
@@ -626,7 +610,6 @@ with col1:
     subcat_stats['Avg Order Value'] = subcat_stats['Sales'] / subcat_stats['Order ID']
     subcat_stats = subcat_stats.sort_values('Sales', ascending=False).head(15)
     
-    # Create a simple scatter plot with correct hover formatting
     fig_subcat_perf = px.scatter(
         subcat_stats,
         x='Order ID',
@@ -643,7 +626,6 @@ with col1:
         size_max=30
     )
     
-    # Update hover template to show proper formatting with commas and 2 decimals
     fig_subcat_perf.update_traces(
         marker=dict(line=dict(width=1, color='white')),
         hovertemplate='<b>%{hovertext}</b><br>' +
@@ -664,17 +646,34 @@ with col1:
     )
     st.plotly_chart(fig_subcat_perf, use_container_width=True)
 
+    # ── Insight Card: Premium vs High-Volume products ──────────────────────
+    top_revenue_sub = subcat_stats.nlargest(1, 'Sales').iloc[0]
+    top_volume_sub  = subcat_stats.nlargest(1, 'Order ID').iloc[0]
+    revenue_per_order_top = top_revenue_sub['Sales'] / top_revenue_sub['Order ID']
+    revenue_per_order_vol = top_volume_sub['Sales'] / top_volume_sub['Order ID']
+
+    st.markdown(f"""
+    <div class="insight-card" style="margin-top:16px; border-left-color:#9f7aea;">
+        <div class="insight-icon">💡</div>
+        <div class="insight-label">Key Insight — Premium vs. High-Volume</div>
+        <div class="insight-value">{top_revenue_sub['Sub-Category']} leads in total revenue</div>
+        <div class="insight-detail">
+            <strong>{top_revenue_sub['Sub-Category']}</strong> earns
+            ${revenue_per_order_top:,.0f}/order across {int(top_revenue_sub['Order ID']):,} orders,
+            while <strong>{top_volume_sub['Sub-Category']}</strong> drives the most orders
+            ({int(top_volume_sub['Order ID']):,}) but at only ${revenue_per_order_vol:,.0f}/order.
+            Consider bundling high-volume, low-ticket items with premium products to lift average basket size.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 with col2:
-    # Segment Correlation Analysis
-    # Create monthly sales for each segment
     monthly_segment = filtered_df.groupby(['Year', 'Month', 'Segment'])['Sales'].sum().reset_index()
     monthly_segment['Date'] = pd.to_datetime(monthly_segment[['Year', 'Month']].assign(day=1))
     
-    # Pivot for correlation
     segment_pivot = monthly_segment.pivot(index='Date', columns='Segment', values='Sales').fillna(0)
     segment_corr = segment_pivot.corr()
     
-    # Create correlation heatmap
     fig_seg_corr = go.Figure(data=go.Heatmap(
         z=segment_corr.values,
         x=segment_corr.columns,
@@ -696,7 +695,6 @@ with col2:
     )
     st.plotly_chart(fig_seg_corr, use_container_width=True)
     
-    # Find strongest and weakest correlations
     segs = segment_corr.columns.tolist()
     corr_pairs = []
     for i in range(len(segs)):
@@ -738,7 +736,6 @@ st.header("🌎 Regional Performance")
 col1, col2 = st.columns(2)
 
 with col1:
-    # Region performance
     region_stats = filtered_df.groupby('Region').agg({
         'Sales': 'sum',
         'Order ID': 'nunique',
@@ -766,7 +763,6 @@ with col1:
     st.plotly_chart(fig_region, use_container_width=True)
 
 with col2:
-    # Region vs Category
     region_cat = filtered_df.groupby(['Region', 'Category'])['Sales'].sum().reset_index()
     
     fig_region_cat = px.bar(
@@ -805,7 +801,6 @@ city_stats['Avg Order Value'] = city_stats['Total Sales'] / city_stats['Orders']
 city_stats = city_stats.nlargest(20, 'Total Sales').reset_index(drop=True)
 city_stats.index = range(1, len(city_stats) + 1)
 
-# Format for display
 display_df = city_stats.copy()
 display_df['Total Sales'] = display_df['Total Sales'].apply('${:,.2f}'.format)
 display_df['Avg Order Value'] = display_df['Avg Order Value'].apply('${:,.2f}'.format)

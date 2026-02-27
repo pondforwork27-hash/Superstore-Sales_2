@@ -836,6 +836,7 @@ with col2:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #718096; font-size: 0.8rem; padding: 20px;">
-    📊 Superstore Sales Analytics Dashboard • Built with Streamlit
+    🛒 Superstore Sales Analytics Dashboard • Built with Streamlit
 </div>
 """, unsafe_allow_html=True)
+

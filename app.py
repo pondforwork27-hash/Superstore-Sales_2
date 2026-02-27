@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as st
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
@@ -653,7 +653,7 @@ with col1:
     )
     
     fig_subcat_perf.update_layout(
-        height=400,
+        height=500,
         xaxis_title='Number of Orders',
         yaxis_title='Total Sales ($)',
         hoverlabel=dict(
@@ -663,67 +663,6 @@ with col1:
         )
     )
     st.plotly_chart(fig_subcat_perf, use_container_width=True)
-    
-    # Calculate insights
-    top_performer = subcat_stats.iloc[0]['Sub-Category']
-    top_sales = subcat_stats.iloc[0]['Sales']
-    top_orders = subcat_stats.iloc[0]['Order ID']
-    top_avg = subcat_stats.iloc[0]['Avg Order Value']
-    
-    highest_avg_row = subcat_stats.loc[subcat_stats['Avg Order Value'].idxmax()]
-    highest_avg_cat = highest_avg_row['Sub-Category']
-    highest_avg_val = highest_avg_row['Avg Order Value']
-    
-    most_orders_row = subcat_stats.loc[subcat_stats['Order ID'].idxmax()]
-    most_orders_cat = most_orders_row['Sub-Category']
-    most_orders_count = most_orders_row['Order ID']
-    
-    bottom_performer = subcat_stats.iloc[-1]['Sub-Category']
-    
-    # INSIGHT UNDER SCATTER CHART
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #0d1b2a 0%, #1b2a3b 100%);
-                border: 1px solid #2d4a6b;
-                border-radius: 12px;
-                padding: 20px;
-                margin-top: 20px;">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-            <span style="font-size: 1.8rem;">📊</span>
-            <span style="font-size: 1.2rem; font-weight: 600; color: #90cdf4;">Sub-Category Insights</span>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-            <div style="background: rgba(66,153,225,0.1); border-radius: 8px; padding: 12px;">
-                <div style="font-size: 0.7rem; color: #a0aec0; margin-bottom: 4px;">🏆 TOP PERFORMER</div>
-                <div style="font-size: 1.2rem; font-weight: 600; color: white;">{top_performer}</div>
-                <div style="font-size: 0.9rem; color: #90cdf4;">${top_sales:,.0f} total</div>
-                <div style="font-size: 0.8rem; color: #a0aec0;">{top_orders:,} orders • ${top_avg:,.2f} avg</div>
-            </div>
-            
-            <div style="background: rgba(72,187,120,0.1); border-radius: 8px; padding: 12px;">
-                <div style="font-size: 0.7rem; color: #a0aec0; margin-bottom: 4px;">💰 HIGHEST AVERAGE</div>
-                <div style="font-size: 1.2rem; font-weight: 600; color: white;">{highest_avg_cat}</div>
-                <div style="font-size: 0.9rem; color: #90cdf4;">${highest_avg_val:,.2f} per order</div>
-                <div style="font-size: 0.8rem; color: #a0aec0;">Premium priced items</div>
-            </div>
-        </div>
-        
-        <div style="background: rgba(237,137,54,0.1); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-            <div style="font-size: 0.7rem; color: #a0aec0; margin-bottom: 4px;">📦 MOST FREQUENT</div>
-            <div style="font-size: 1.2rem; font-weight: 600; color: white;">{most_orders_cat}</div>
-            <div style="font-size: 0.9rem; color: #90cdf4;">{most_orders_count:,} orders</div>
-            <div style="font-size: 0.8rem; color: #a0aec0;">High volume, fast-moving category</div>
-        </div>
-        
-        <div style="background: rgba(66,153,225,0.05); border-radius: 8px; padding: 15px; border-left: 4px solid #4299e1;">
-            <div style="font-size: 0.8rem; color: #e2e8f0; line-height: 1.6;">
-                <strong>💡 Actionable Insight:</strong> Focus marketing efforts on <strong style="color: #90cdf4;">{top_performer}</strong> as it generates the highest revenue. 
-                Consider bundling with lower-performing items like {bottom_performer} to boost their sales. 
-                The high average order value of <strong style="color: #90cdf4;">{highest_avg_cat}</strong> suggests premium pricing opportunities.
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
 
 with col2:
     # Segment Correlation Analysis
@@ -751,7 +690,7 @@ with col2:
     
     fig_seg_corr.update_layout(
         title='Segment Sales Correlation<br><sup>How customer segments move together over time</sup>',
-        height=400,
+        height=500,
         xaxis_title='',
         yaxis_title=''
     )
@@ -768,27 +707,26 @@ with col2:
     strongest = corr_pairs[0] if corr_pairs else None
     weakest = corr_pairs[-1] if corr_pairs else None
     
-    # Correlation insight cards
     col_a, col_b = st.columns(2)
     with col_a:
         if strongest:
             st.markdown(f"""
-            <div class="insight-card good" style="margin-top: 10px; padding: 12px;">
-                <div style="font-size: 0.8rem; color: #a0aec0;">STRONGEST CORRELATION</div>
-                <div style="font-size: 1.1rem; font-weight: 600; color: white;">{strongest[0]} & {strongest[1]}</div>
-                <div style="font-size: 0.8rem; color: #90cdf4;">r = {strongest[2]:.3f}</div>
-                <div style="font-size: 0.75rem; color: #a0aec0; margin-top: 5px;">Move together • Shared campaigns work</div>
+            <div class="insight-card good" style="margin-top: 10px;">
+                <div class="insight-icon">📈</div>
+                <div class="insight-label">Strongest Correlation</div>
+                <div class="insight-value">{strongest[0]} & {strongest[1]}</div>
+                <div class="insight-detail">r = <strong>{strongest[2]:.3f}</strong> — These segments move together. Campaigns that boost one will likely lift the other.</div>
             </div>
             """, unsafe_allow_html=True)
     
     with col_b:
         if weakest:
             st.markdown(f"""
-            <div class="insight-card warn" style="margin-top: 10px; padding: 12px;">
-                <div style="font-size: 0.8rem; color: #a0aec0;">WEAKEST CORRELATION</div>
-                <div style="font-size: 1.1rem; font-weight: 600; color: white;">{weakest[0]} & {weakest[1]}</div>
-                <div style="font-size: 0.8rem; color: #90cdf4;">r = {weakest[2]:.3f}</div>
-                <div style="font-size: 0.75rem; color: #a0aec0; margin-top: 5px;">Independent • Need tailored strategies</div>
+            <div class="insight-card warn" style="margin-top: 10px;">
+                <div class="insight-icon">📉</div>
+                <div class="insight-label">Weakest Correlation</div>
+                <div class="insight-value">{weakest[0]} & {weakest[1]}</div>
+                <div class="insight-detail">r = <strong>{weakest[2]:.3f}</strong> — These segments behave independently. Tailored strategies recommended.</div>
             </div>
             """, unsafe_allow_html=True)
 

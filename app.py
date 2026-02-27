@@ -774,10 +774,11 @@ with col2:
         barmode='group',
         color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1']
     )
-    fig_region_cat.update_traces(
-        hovertemplate='<b>%{x}</b><br>Category: %{data.name}<br>Sales: $%{y:,.2f}<extra></extra>'
-    )
-    fig_region_cat.update_layout(
+    fig_region_cat.for_each_trace(
+        lambda t: t.update(
+            hovertemplate=f'<b>%{{x}}</b><br>Category: {t.name}<br>Sales: $%{{y:,.2f}}<extra></extra>'
+        )
+    )    fig_region_cat.update_layout(
         xaxis_title='',
         yaxis_title='Sales ($)',
         height=400,

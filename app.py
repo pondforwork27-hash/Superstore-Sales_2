@@ -227,7 +227,7 @@ if filtered_df.empty:
     st.stop()
 
 # ── Main Dashboard ─────────────────────────────────────────────────────────
-st.title("📊 Superstore Sales Analytics Dashboard")
+st.title("🛒 Superstore Sales Analytics Dashboard")
 st.markdown(f"*Analyzing {len(filtered_df):,} transactions from {filtered_df['Order Date'].min().strftime('%B %Y')} to {filtered_df['Order Date'].max().strftime('%B %Y')}*")
 
 # ── KPI Row ────────────────────────────────────────────────────────────────
@@ -774,11 +774,10 @@ with col2:
         barmode='group',
         color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1']
     )
-    fig_region_cat.for_each_trace(
-        lambda t: t.update(
-            hovertemplate=f'<b>%{{x}}</b><br>Category: {t.name}<br>Sales: $%{{y:,.2f}}<extra></extra>'
-        )
-    )    fig_region_cat.update_layout(
+    fig_region_cat.update_traces(
+        hovertemplate='<b>%{x}</b><br>Category: %{fullData.name}<br>Sales: $%{y:,.2f}<extra></extra>'
+    )
+    fig_region_cat.update_layout(
         xaxis_title='',
         yaxis_title='Sales ($)',
         height=400,
@@ -837,6 +836,7 @@ with col2:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #718096; font-size: 0.8rem; padding: 20px;">
-    📊 Superstore Sales Analytics Dashboard • Built with Streamlit
+    🛒 Superstore Sales Analytics Dashboard • Built with Streamlit
 </div>
 """, unsafe_allow_html=True)
+

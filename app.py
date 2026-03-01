@@ -338,101 +338,99 @@ with col1:
     # ── Redesigned Revenue Intelligence Card ─────────────────────────────────
     top_revenue_sub = subcat_stats.nlargest(1, 'Sales').iloc[0]
     top_volume_sub  = subcat_stats.nlargest(1, 'Order ID').iloc[0]
-    revenue_per_order_top = top_revenue_sub['Sales'] / top_revenue_sub['Order ID']
-    revenue_per_order_vol = top_volume_sub['Sales'] / top_volume_sub['Order ID']
-    revenue_multiplier = revenue_per_order_top / revenue_per_order_vol if revenue_per_order_vol > 0 else 0
-    untapped_potential = (revenue_per_order_top - revenue_per_order_vol) * top_volume_sub['Order ID']
 
-    st.markdown(f"""
-    <div style="
-        margin-top: 20px;
-        background: linear-gradient(135deg, #0d1b2a 0%, #111d2e 60%, #0d1b2a 100%);
-        border: 1px solid rgba(159,122,234,0.35);
-        border-radius: 18px;
-        overflow: hidden;
-        box-shadow: 0 8px 40px rgba(0,0,0,0.6);
-        position: relative;
-    ">
-        <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;
-            background:radial-gradient(circle,rgba(159,122,234,0.18) 0%,transparent 70%);
-            border-radius:50%;pointer-events:none;"></div>
-        <div style="position:absolute;bottom:-30px;left:40px;width:120px;height:120px;
-            background:radial-gradient(circle,rgba(66,153,225,0.12) 0%,transparent 70%);
-            border-radius:50%;pointer-events:none;"></div>
+    # Pre-compute all values into plain variables (avoids dict subscript in f-string)
+    rev_name        = str(top_revenue_sub['Sub-Category'])
+    vol_name        = str(top_volume_sub['Sub-Category'])
+    rev_per_order   = float(top_revenue_sub['Sales']) / float(top_revenue_sub['Order ID'])
+    vol_per_order   = float(top_volume_sub['Sales'])  / float(top_volume_sub['Order ID'])
+    multiplier      = rev_per_order / vol_per_order if vol_per_order > 0 else 0
+    rev_orders      = int(top_revenue_sub['Order ID'])
+    vol_orders      = int(top_volume_sub['Order ID'])
+    untapped        = (rev_per_order - vol_per_order) * vol_orders
 
-        <div style="display:flex;align-items:center;justify-content:space-between;
-            padding:12px 20px;
-            background:linear-gradient(90deg,rgba(159,122,234,0.12) 0%,transparent 100%);
-            border-bottom:1px solid rgba(159,122,234,0.2);">
-            <span style="font-size:0.62rem;font-weight:800;letter-spacing:0.2em;
-                         color:#b794f4;text-transform:uppercase;">⚡ Revenue Intelligence</span>
-            <span style="font-size:0.6rem;font-weight:700;letter-spacing:0.1em;
-                color:#0d1b2a;background:#9f7aea;padding:3px 9px;border-radius:20px;
-                text-transform:uppercase;">Live</span>
-        </div>
+    rev_per_fmt     = f"${rev_per_order:,.0f}"
+    vol_per_fmt     = f"${vol_per_order:,.0f}"
+    multiplier_fmt  = f"{multiplier:.1f}x"
+    rev_orders_fmt  = f"{rev_orders:,}"
+    vol_orders_fmt  = f"{vol_orders:,}"
+    untapped_fmt    = f"${untapped:,.0f}"
 
-        <div style="padding:18px 20px 20px 20px;position:relative;z-index:1;">
+    insight_html = (
+        '<div style="margin-top:20px;background:linear-gradient(135deg,#0d1b2a 0%,#111d2e 60%,#0d1b2a 100%);'
+        'border:1px solid rgba(159,122,234,0.35);border-radius:18px;overflow:hidden;'
+        'box-shadow:0 8px 40px rgba(0,0,0,0.6);position:relative;">'
 
-            <div style="font-size:1.05rem;font-weight:700;color:#f7fafc;line-height:1.35;margin-bottom:4px;">
-                <span style="color:#b794f4;">{top_revenue_sub['Sub-Category']}</span> earns
-                <span style="display:inline-block;background:rgba(159,122,234,0.15);
-                    border:1px solid rgba(159,122,234,0.4);color:#e9d8fd;
-                    font-size:1rem;font-weight:800;padding:1px 8px;border-radius:6px;margin:0 2px;">
-                    {revenue_multiplier:.1f}×
-                </span>
-                more per order than <span style="color:#90cdf4;">{top_volume_sub['Sub-Category']}</span>
-            </div>
-            <div style="font-size:0.75rem;color:#718096;margin-bottom:16px;">
-                Two distinct growth engines. One maximises ticket size — the other, repeat frequency.
-            </div>
+        # ambient glows
+        '<div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;'
+        'background:radial-gradient(circle,rgba(159,122,234,0.18) 0%,transparent 70%);'
+        'border-radius:50%;pointer-events:none;"></div>'
+        '<div style="position:absolute;bottom:-30px;left:40px;width:120px;height:120px;'
+        'background:radial-gradient(circle,rgba(66,153,225,0.12) 0%,transparent 70%);'
+        'border-radius:50%;pointer-events:none;"></div>'
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-                <div style="background:rgba(159,122,234,0.07);border:1px solid rgba(159,122,234,0.22);
-                    border-radius:12px;padding:13px 15px;">
-                    <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;
-                        color:#b794f4;margin-bottom:5px;font-weight:700;">👑 High-Ticket</div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#fff;line-height:1;
-                        font-variant-numeric:tabular-nums;">${revenue_per_order_top:,.0f}</div>
-                    <div style="font-size:0.68rem;color:#a0aec0;margin-top:3px;">
-                        per order &nbsp;·&nbsp; {int(top_revenue_sub['Order ID']):,} orders</div>
-                    <div style="margin-top:8px;font-size:0.75rem;font-weight:600;color:#e9d8fd;
-                        border-top:1px solid rgba(159,122,234,0.15);padding-top:7px;">
-                        {top_revenue_sub['Sub-Category']}</div>
-                </div>
-                <div style="background:rgba(66,153,225,0.07);border:1px solid rgba(66,153,225,0.22);
-                    border-radius:12px;padding:13px 15px;">
-                    <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;
-                        color:#63b3ed;margin-bottom:5px;font-weight:700;">🔁 High-Volume</div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#fff;line-height:1;
-                        font-variant-numeric:tabular-nums;">${revenue_per_order_vol:,.0f}</div>
-                    <div style="font-size:0.68rem;color:#a0aec0;margin-top:3px;">
-                        per order &nbsp;·&nbsp; {int(top_volume_sub['Order ID']):,} orders</div>
-                    <div style="margin-top:8px;font-size:0.75rem;font-weight:600;color:#bee3f8;
-                        border-top:1px solid rgba(66,153,225,0.15);padding-top:7px;">
-                        {top_volume_sub['Sub-Category']}</div>
-                </div>
-            </div>
+        # header
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;'
+        'background:linear-gradient(90deg,rgba(159,122,234,0.12) 0%,transparent 100%);'
+        'border-bottom:1px solid rgba(159,122,234,0.2);">'
+        '<span style="font-size:0.62rem;font-weight:800;letter-spacing:0.2em;color:#b794f4;text-transform:uppercase;">'
+        '&#9889; Revenue Intelligence</span>'
+        '<span style="font-size:0.6rem;font-weight:700;letter-spacing:0.1em;color:#0d1b2a;background:#9f7aea;'
+        'padding:3px 9px;border-radius:20px;text-transform:uppercase;">Live</span>'
+        '</div>'
 
-            <div style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;
-                background:rgba(255,255,255,0.025);border-radius:10px;
-                border-left:3px solid rgba(159,122,234,0.5);">
-                <span style="font-size:1rem;flex-shrink:0;margin-top:1px;">🎯</span>
-                <div>
-                    <span style="font-size:0.68rem;font-weight:700;color:#b794f4;
-                        text-transform:uppercase;letter-spacing:0.1em;">Opportunity</span>
-                    <div style="font-size:0.76rem;color:#90cdf4;margin-top:3px;line-height:1.5;">
-                        Pairing <strong style="color:#e9d8fd;">{top_volume_sub['Sub-Category']}</strong>'s order
-                        frequency with <strong style="color:#e9d8fd;">{top_revenue_sub['Sub-Category']}</strong>'s
-                        ticket price could unlock an estimated
-                        <strong style="color:#faf089;">${untapped_potential:,.0f}</strong> in incremental revenue —
-                        without acquiring a single new customer.
-                    </div>
-                </div>
-            </div>
+        # body
+        '<div style="padding:18px 20px 20px 20px;position:relative;z-index:1;">'
 
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        # headline
+        '<div style="font-size:1.05rem;font-weight:700;color:#f7fafc;line-height:1.35;margin-bottom:4px;">'
+        '<span style="color:#b794f4;">' + rev_name + '</span> earns '
+        '<span style="display:inline-block;background:rgba(159,122,234,0.15);border:1px solid rgba(159,122,234,0.4);'
+        'color:#e9d8fd;font-size:1rem;font-weight:800;padding:1px 8px;border-radius:6px;margin:0 2px;">'
+        + multiplier_fmt + '</span> '
+        'more per order than <span style="color:#90cdf4;">' + vol_name + '</span>'
+        '</div>'
+        '<div style="font-size:0.75rem;color:#718096;margin-bottom:16px;">'
+        'Two distinct growth engines. One maximises ticket size &#8212; the other, repeat frequency.'
+        '</div>'
+
+        # dual stat cards
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'
+
+        '<div style="background:rgba(159,122,234,0.07);border:1px solid rgba(159,122,234,0.22);border-radius:12px;padding:13px 15px;">'
+        '<div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;color:#b794f4;margin-bottom:5px;font-weight:700;">&#128081; High-Ticket</div>'
+        '<div style="font-size:1.55rem;font-weight:800;color:#fff;line-height:1;font-variant-numeric:tabular-nums;">' + rev_per_fmt + '</div>'
+        '<div style="font-size:0.68rem;color:#a0aec0;margin-top:3px;">per order &nbsp;&middot;&nbsp; ' + rev_orders_fmt + ' orders</div>'
+        '<div style="margin-top:8px;font-size:0.75rem;font-weight:600;color:#e9d8fd;border-top:1px solid rgba(159,122,234,0.15);padding-top:7px;">' + rev_name + '</div>'
+        '</div>'
+
+        '<div style="background:rgba(66,153,225,0.07);border:1px solid rgba(66,153,225,0.22);border-radius:12px;padding:13px 15px;">'
+        '<div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;color:#63b3ed;margin-bottom:5px;font-weight:700;">&#128257; High-Volume</div>'
+        '<div style="font-size:1.55rem;font-weight:800;color:#fff;line-height:1;font-variant-numeric:tabular-nums;">' + vol_per_fmt + '</div>'
+        '<div style="font-size:0.68rem;color:#a0aec0;margin-top:3px;">per order &nbsp;&middot;&nbsp; ' + vol_orders_fmt + ' orders</div>'
+        '<div style="margin-top:8px;font-size:0.75rem;font-weight:600;color:#bee3f8;border-top:1px solid rgba(66,153,225,0.15);padding-top:7px;">' + vol_name + '</div>'
+        '</div>'
+
+        '</div>'
+
+        # opportunity callout
+        '<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;'
+        'background:rgba(255,255,255,0.025);border-radius:10px;border-left:3px solid rgba(159,122,234,0.5);">'
+        '<span style="font-size:1rem;flex-shrink:0;margin-top:1px;">&#127919;</span>'
+        '<div>'
+        '<span style="font-size:0.68rem;font-weight:700;color:#b794f4;text-transform:uppercase;letter-spacing:0.1em;">Opportunity</span>'
+        '<div style="font-size:0.76rem;color:#90cdf4;margin-top:3px;line-height:1.5;">'
+        'Pairing <strong style="color:#e9d8fd;">' + vol_name + '</strong>\'s order frequency with '
+        '<strong style="color:#e9d8fd;">' + rev_name + '</strong>\'s ticket price could unlock an estimated '
+        '<strong style="color:#faf089;">' + untapped_fmt + '</strong> in incremental revenue &#8212; '
+        'without acquiring a single new customer.'
+        '</div>'
+        '</div>'
+        '</div>'
+
+        '</div></div>'
+    )
+    st.markdown(insight_html, unsafe_allow_html=True)
 
 with col2:
     monthly_segment = filtered_df.groupby(['Year', 'Month', 'Segment'])['Sales'].sum().reset_index()

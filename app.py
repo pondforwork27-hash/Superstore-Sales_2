@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime, timedelta
 import warnings
-from streamlit_option_menu import option_menu
 import pytz
 
 # Ignore warnings for cleaner output
@@ -143,6 +142,28 @@ st.markdown("""
         padding-bottom: 12px;
         position: relative;
         z-index: 1;
+    }
+    
+    /* Navigation */
+    .nav-item {
+        padding: 12px 16px;
+        margin: 4px 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .nav-item:hover {
+        background: rgba(56, 189, 248, 0.1);
+        color: #38bdf8;
+    }
+    .nav-item.active {
+        background: #1e293b;
+        color: #38bdf8;
+        border-left: 3px solid #38bdf8;
     }
     
     /* Table Styling */
@@ -304,121 +325,128 @@ def calculate_growth(current, previous):
         return 0
     return ((current - previous) / previous) * 100
 
+# ── Navigation Function ───────────────────────────────────────────────────────
+
+def render_navigation():
+    """Render navigation using native Streamlit components"""
+    st.sidebar.markdown("""
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #38bdf8; font-size: 2rem; margin-bottom: 0;">📊</h1>
+        <h2 style="color: #f1f5f9; font-size: 1.5rem; margin-top: 0;">Analytics Pro</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Navigation using radio buttons with custom styling
+    nav_options = {
+        "Overview": "🏠 Overview",
+        "Sales Analysis": "📈 Sales Analysis",
+        "Product Insights": "📦 Product Insights",
+        "Customer Intelligence": "👥 Customer Intelligence",
+        "Geographic Map": "🗺️ Geographic Map"
+    }
+    
+    # Create a list of display names
+    display_names = list(nav_options.values())
+    
+    # Use radio for navigation
+    selected_display = st.sidebar.radio(
+        "Navigation",
+        options=display_names,
+        label_visibility="collapsed"
+    )
+    
+    # Map back to internal names
+    for key, value in nav_options.items():
+        if value == selected_display:
+            return key
+    
+    return "Overview"
+
 # ── Render Functions ──────────────────────────────────────────────────────────
 
-def render_sidebar(df):
-    with st.sidebar:
-        st.markdown("""
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #38bdf8; font-size: 2rem; margin-bottom: 0;">📊</h1>
-            <h2 style="color: #f1f5f9; font-size: 1.5rem; margin-top: 0;">Analytics Pro</h2>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Navigation with icons
-        selected = option_menu(
-            menu_title=None,
-            options=["Overview", "Sales Analysis", "Product Insights", "Customer Intelligence", "Geographic Map"],
-            icons=["house", "graph-up", "box", "people", "geo-alt"],
-            menu_icon="cast",
-            default_index=0,
-            styles={
-                "container": {"padding": "0!important", "background-color": "transparent"},
-                "icon": {"color": "#38bdf8", "font-size": "18px"},
-                "nav-link": {
-                    "font-size": "14px",
-                    "text-align": "left",
-                    "margin": "4px 0",
-                    "--hover-color": "#1e293b",
-                    "color": "#94a3b8"
-                },
-                "nav-link-selected": {"background-color": "#1e293b", "color": "#38bdf8"},
-            }
-        )
-        
-        st.markdown("---")
-
-        # Filters with better organization
-        st.markdown("### 🔍 Filter Panel")
-        
-        # Date range with quick selects
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📅 This Year", use_container_width=True):
-                current_year = datetime.now().year
-                date_range = [datetime(current_year, 1, 1), datetime(current_year, 12, 31)]
-        with col2:
-            if st.button("📅 Last Year", use_container_width=True):
-                current_year = datetime.now().year
-                date_range = [datetime(current_year-1, 1, 1), datetime(current_year-1, 12, 31)]
-        
-        min_date = df['Order Date'].min()
-        max_date = df['Order Date'].max()
-        
-        date_range = st.date_input(
-            "Custom Range",
-            value=[min_date, max_date],
-            min_value=min_date,
-            max_value=max_date
-        )
-        
-        # Hierarchical filters
-        with st.expander("🏷️ Category Filters", expanded=True):
-            all_categories = st.checkbox("Select All Categories", value=True)
-            if all_categories:
-                categories = []
-            else:
-                categories = st.multiselect(
-                    "Categories",
-                    options=sorted(df['Category'].unique()),
-                    default=[]
-                )
-        
-        with st.expander("📍 Region Filters", expanded=True):
-            all_regions = st.checkbox("Select All Regions", value=True)
-            if all_regions:
-                regions = []
-            else:
-                regions = st.multiselect(
-                    "Regions",
-                    options=sorted(df['Region'].unique()),
-                    default=[]
-                )
-        
-        with st.expander("👥 Segment Filters", expanded=True):
-            all_segments = st.checkbox("Select All Segments", value=True)
-            if all_segments:
-                segments = []
-            else:
-                segments = st.multiselect(
-                    "Segments",
-                    options=sorted(df['Segment'].unique()),
-                    default=[]
-                )
-        
-        # Search box
-        with st.expander("🔎 Search", expanded=False):
-            search_term = st.text_input("Search by Product or Customer", "")
-        
-        # Reset filters button
-        if st.button("🔄 Reset All Filters", use_container_width=True):
-            st.experimental_rerun()
-        
-        st.markdown("---")
-        
-        # Data summary
-        st.markdown("### 📊 Data Summary")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total Records", f"{len(df):,}")
-        with col2:
-            st.metric("Date Range", f"{df['Order Date'].min().year}-{df['Order Date'].max().year}")
-        
-        st.markdown("---")
-        st.caption(f"⚡ Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        st.caption("📁 Source: cleaned_train.csv")
-        
-    return selected, date_range, regions, categories, segments, search_term
+def render_sidebar_filters(df):
+    """Render filters in sidebar"""
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🔍 Filter Panel")
+    
+    # Date range with quick selects
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("📅 This Year", use_container_width=True):
+            current_year = datetime.now().year
+            date_range = [datetime(current_year, 1, 1), datetime(current_year, 12, 31)]
+    with col2:
+        if st.button("📅 Last Year", use_container_width=True):
+            current_year = datetime.now().year
+            date_range = [datetime(current_year-1, 1, 1), datetime(current_year-1, 12, 31)]
+    
+    min_date = df['Order Date'].min()
+    max_date = df['Order Date'].max()
+    
+    date_range = st.sidebar.date_input(
+        "Custom Range",
+        value=[min_date, max_date],
+        min_value=min_date,
+        max_value=max_date
+    )
+    
+    # Hierarchical filters
+    with st.sidebar.expander("🏷️ Category Filters", expanded=True):
+        all_categories = st.checkbox("Select All Categories", value=True)
+        if all_categories:
+            categories = []
+        else:
+            categories = st.multiselect(
+                "Categories",
+                options=sorted(df['Category'].unique()),
+                default=[]
+            )
+    
+    with st.sidebar.expander("📍 Region Filters", expanded=True):
+        all_regions = st.checkbox("Select All Regions", value=True)
+        if all_regions:
+            regions = []
+        else:
+            regions = st.multiselect(
+                "Regions",
+                options=sorted(df['Region'].unique()),
+                default=[]
+            )
+    
+    with st.sidebar.expander("👥 Segment Filters", expanded=True):
+        all_segments = st.checkbox("Select All Segments", value=True)
+        if all_segments:
+            segments = []
+        else:
+            segments = st.multiselect(
+                "Segments",
+                options=sorted(df['Segment'].unique()),
+                default=[]
+            )
+    
+    # Search box
+    with st.sidebar.expander("🔎 Search", expanded=False):
+        search_term = st.text_input("Search by Product or Customer", "")
+    
+    # Reset filters button
+    if st.sidebar.button("🔄 Reset All Filters", use_container_width=True):
+        st.rerun()
+    
+    st.sidebar.markdown("---")
+    
+    # Data summary
+    st.sidebar.markdown("### 📊 Data Summary")
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        st.metric("Total Records", f"{len(df):,}")
+    with col2:
+        st.metric("Date Range", f"{df['Order Date'].min().year}-{df['Order Date'].max().year}")
+    
+    st.sidebar.markdown("---")
+    st.sidebar.caption(f"⚡ Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    st.sidebar.caption("📁 Source: cleaned_train.csv")
+    
+    return date_range, regions, categories, segments, search_term
 
 def apply_filters(df, date_range, regions, categories, segments, search_term):
     mask = pd.Series([True] * len(df))
@@ -435,8 +463,11 @@ def apply_filters(df, date_range, regions, categories, segments, search_term):
         mask &= df['Segment'].isin(segments)
     
     if search_term:
-        mask &= (df['Product Name'].str.contains(search_term, case=False, na=False) | 
-                df['Customer Name'].str.contains(search_term, case=False, na=False))
+        # Check if columns exist before searching
+        if 'Product Name' in df.columns:
+            mask &= df['Product Name'].str.contains(search_term, case=False, na=False)
+        if 'Customer Name' in df.columns:
+            mask &= df['Customer Name'].str.contains(search_term, case=False, na=False)
     
     return df[mask].copy()
 
@@ -888,8 +919,8 @@ def render_product_insights(df):
     st.title("📦 Product Performance")
     
     # Top-level metrics
-    total_products = df['Product ID'].nunique()
-    avg_price = df['Sales'].sum() / df['Quantity'].sum()
+    total_products = df['Product ID'].nunique() if 'Product ID' in df.columns else 0
+    avg_price = df['Sales'].sum() / df['Quantity'].sum() if 'Quantity' in df.columns else 0
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -915,7 +946,7 @@ def render_product_insights(df):
                 'Sales': 'sum',
                 'Profit': 'sum',
                 'Order ID': 'nunique',
-                'Quantity': 'sum'
+                'Quantity': 'sum' if 'Quantity' in df.columns else 'count'
             }).reset_index()
             
             cat_stats['Profit Margin'] = (cat_stats['Profit'] / cat_stats['Sales']) * 100
@@ -963,29 +994,32 @@ def render_product_insights(df):
         with col1:
             st.subheader("🏆 Top 10 Products by Sales")
             
-            top_products = df.groupby('Product Name').agg({
-                'Sales': 'sum',
-                'Quantity': 'sum',
-                'Order ID': 'nunique'
-            }).nlargest(10, 'Sales').reset_index()
-            
-            top_products['Avg Price'] = top_products['Sales'] / top_products['Quantity']
-            
-            fig_top = px.bar(
-                top_products,
-                x='Sales',
-                y='Product Name',
-                orientation='h',
-                color='Quantity',
-                text=top_products['Sales'].apply(lambda x: f'${x/1000:.0f}K'),
-                title="Top Products by Revenue",
-                color_continuous_scale='Viridis',
-                labels={'Sales': 'Total Sales ($)', 'Quantity': 'Units Sold'}
-            )
-            
-            fig_top.update_layout(**get_plotly_theme(), height=500, yaxis={'categoryorder':'total ascending'})
-            fig_top.update_traces(textposition='outside')
-            st.plotly_chart(fig_top, use_container_width=True)
+            if 'Product Name' in df.columns:
+                top_products = df.groupby('Product Name').agg({
+                    'Sales': 'sum',
+                    'Quantity': 'sum' if 'Quantity' in df.columns else 'count',
+                    'Order ID': 'nunique'
+                }).nlargest(10, 'Sales').reset_index()
+                
+                top_products['Avg Price'] = top_products['Sales'] / top_products['Quantity']
+                
+                fig_top = px.bar(
+                    top_products,
+                    x='Sales',
+                    y='Product Name',
+                    orientation='h',
+                    color='Quantity',
+                    text=top_products['Sales'].apply(lambda x: f'${x/1000:.0f}K'),
+                    title="Top Products by Revenue",
+                    color_continuous_scale='Viridis',
+                    labels={'Sales': 'Total Sales ($)', 'Quantity': 'Units Sold'}
+                )
+                
+                fig_top.update_layout(**get_plotly_theme(), height=500, yaxis={'categoryorder':'total ascending'})
+                fig_top.update_traces(textposition='outside')
+                st.plotly_chart(fig_top, use_container_width=True)
+            else:
+                st.info("Product Name column not available")
             
         with col2:
             st.subheader("📈 Top Sub-Categories by Growth")
@@ -1086,10 +1120,10 @@ def render_customer_intelligence(df):
     st.title("👥 Customer Analytics")
     
     # Customer metrics
-    total_customers = df['Customer ID'].nunique()
-    avg_customer_value = df.groupby('Customer ID')['Sales'].sum().mean()
-    repeat_customers = df.groupby('Customer ID')['Order ID'].nunique()
-    repeat_rate = (repeat_customers[repeat_customers > 1].count() / total_customers * 100)
+    total_customers = df['Customer ID'].nunique() if 'Customer ID' in df.columns else 0
+    avg_customer_value = df.groupby('Customer ID')['Sales'].sum().mean() if 'Customer ID' in df.columns else 0
+    repeat_customers = df.groupby('Customer ID')['Order ID'].nunique() if 'Customer ID' in df.columns else pd.Series()
+    repeat_rate = (repeat_customers[repeat_customers > 1].count() / total_customers * 100) if total_customers > 0 else 0
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -1119,90 +1153,93 @@ def render_customer_intelligence(df):
         rfm.columns = ['Customer ID', 'Recency', 'Frequency', 'Monetary']
         
         # Create scores
-        rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1], duplicates='drop')
-        rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4], duplicates='drop')
-        rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4], duplicates='drop')
-        
-        # Convert scores to numeric
-        for col in ['R_Score', 'F_Score', 'M_Score']:
-            rfm[col] = pd.to_numeric(rfm[col])
-        
-        rfm['RFM_Score'] = rfm['R_Score'] + rfm['F_Score'] + rfm['M_Score']
-        
-        # Segment customers
-        def segment_customer(row):
-            if row['RFM_Score'] >= 10:
-                return 'Champions'
-            elif row['RFM_Score'] >= 8:
-                return 'Loyal Customers'
-            elif row['RFM_Score'] >= 6:
-                return 'Potential Loyalists'
-            elif row['RFM_Score'] >= 4:
-                return 'At Risk'
-            else:
-                return 'Lost'
-        
-        rfm['Segment'] = rfm.apply(segment_customer, axis=1)
-        
-        # Display RFM visualization
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # 3D Scatter plot of RFM
-            fig_rfm = px.scatter_3d(
-                rfm,
-                x='Recency',
-                y='Frequency',
-                z='Monetary',
-                color='Segment',
-                hover_name='Customer ID',
-                title="RFM Analysis - 3D Customer Segmentation",
-                labels={'Recency': 'Days Since Last Purchase', 
-                       'Frequency': 'Number of Orders',
-                       'Monetary': 'Total Spend ($)'}
-            )
+        try:
+            rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1], duplicates='drop')
+            rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4], duplicates='drop')
+            rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4], duplicates='drop')
             
-            fig_rfm.update_layout(**get_plotly_theme(), height=600)
-            st.plotly_chart(fig_rfm, use_container_width=True)
+            # Convert scores to numeric
+            for col in ['R_Score', 'F_Score', 'M_Score']:
+                rfm[col] = pd.to_numeric(rfm[col])
             
-        with col2:
-            st.subheader("Segment Distribution")
+            rfm['RFM_Score'] = rfm['R_Score'] + rfm['F_Score'] + rfm['M_Score']
             
-            seg_counts = rfm['Segment'].value_counts().reset_index()
-            seg_counts.columns = ['Segment', 'Count']
+            # Segment customers
+            def segment_customer(row):
+                if row['RFM_Score'] >= 10:
+                    return 'Champions'
+                elif row['RFM_Score'] >= 8:
+                    return 'Loyal Customers'
+                elif row['RFM_Score'] >= 6:
+                    return 'Potential Loyalists'
+                elif row['RFM_Score'] >= 4:
+                    return 'At Risk'
+                else:
+                    return 'Lost'
             
-            fig_seg = px.pie(
-                seg_counts,
-                values='Count',
-                names='Segment',
-                hole=0.4,
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
+            rfm['Segment'] = rfm.apply(segment_customer, axis=1)
             
-            fig_seg.update_layout(**get_plotly_theme(), height=400)
-            st.plotly_chart(fig_seg, use_container_width=True)
+            # Display RFM visualization
+            col1, col2 = st.columns([2, 1])
             
-            # Segment characteristics
-            st.subheader("Segment Characteristics")
-            seg_stats = rfm.groupby('Segment').agg({
-                'Recency': 'mean',
-                'Frequency': 'mean',
-                'Monetary': 'mean',
-                'Customer ID': 'count'
-            }).round(1)
-            
-            seg_stats.columns = ['Avg Recency', 'Avg Frequency', 'Avg Spend', 'Count']
-            seg_stats = seg_stats.sort_values('Avg Spend', ascending=False)
-            
-            st.dataframe(
-                seg_stats.style.format({
-                    'Avg Recency': '{:.0f} days',
-                    'Avg Frequency': '{:.1f}',
-                    'Avg Spend': '${:,.0f}',
-                    'Count': '{:,.0f}'
-                }),
-                use_container_width=True
-            )
+            with col1:
+                # 3D Scatter plot of RFM
+                fig_rfm = px.scatter_3d(
+                    rfm,
+                    x='Recency',
+                    y='Frequency',
+                    z='Monetary',
+                    color='Segment',
+                    hover_name='Customer ID',
+                    title="RFM Analysis - 3D Customer Segmentation",
+                    labels={'Recency': 'Days Since Last Purchase', 
+                           'Frequency': 'Number of Orders',
+                           'Monetary': 'Total Spend ($)'}
+                )
+                
+                fig_rfm.update_layout(**get_plotly_theme(), height=600)
+                st.plotly_chart(fig_rfm, use_container_width=True)
+                
+            with col2:
+                st.subheader("Segment Distribution")
+                
+                seg_counts = rfm['Segment'].value_counts().reset_index()
+                seg_counts.columns = ['Segment', 'Count']
+                
+                fig_seg = px.pie(
+                    seg_counts,
+                    values='Count',
+                    names='Segment',
+                    hole=0.4,
+                    color_discrete_sequence=px.colors.qualitative.Set3
+                )
+                
+                fig_seg.update_layout(**get_plotly_theme(), height=400)
+                st.plotly_chart(fig_seg, use_container_width=True)
+                
+                # Segment characteristics
+                st.subheader("Segment Characteristics")
+                seg_stats = rfm.groupby('Segment').agg({
+                    'Recency': 'mean',
+                    'Frequency': 'mean',
+                    'Monetary': 'mean',
+                    'Customer ID': 'count'
+                }).round(1)
+                
+                seg_stats.columns = ['Avg Recency', 'Avg Frequency', 'Avg Spend', 'Count']
+                seg_stats = seg_stats.sort_values('Avg Spend', ascending=False)
+                
+                st.dataframe(
+                    seg_stats.style.format({
+                        'Avg Recency': '{:.0f} days',
+                        'Avg Frequency': '{:.1f}',
+                        'Avg Spend': '${:,.0f}',
+                        'Count': '{:,.0f}'
+                    }),
+                    use_container_width=True
+                )
+        except Exception as e:
+            st.warning(f"RFM Analysis could not be completed: {e}")
     
     st.markdown("---")
     
@@ -1212,51 +1249,54 @@ def render_customer_intelligence(df):
     with col1:
         st.subheader("👑 Top 10 Customers by Spend")
         
-        top_customers = df.groupby('Customer Name').agg({
-            'Sales': 'sum',
-            'Order ID': 'nunique',
-            'Profit': 'sum'
-        }).nlargest(10, 'Sales').reset_index()
-        
-        top_customers['Avg Order'] = top_customers['Sales'] / top_customers['Order ID']
-        
-        fig_top = go.Figure(data=[
-            go.Bar(
-                name='Total Spend',
-                x=top_customers['Customer Name'],
-                y=top_customers['Sales'],
-                marker_color='#38bdf8',
-                text=top_customers['Sales'].apply(lambda x: f'${x:,.0f}'),
-                textposition='outside'
-            ),
-            go.Scatter(
-                name='Avg Order Value',
-                x=top_customers['Customer Name'],
-                y=top_customers['Avg Order'],
-                yaxis='y2',
-                mode='lines+markers',
-                line=dict(color='#f97316', width=3),
-                marker=dict(size=8),
-                text=top_customers['Avg Order'].apply(lambda x: f'${x:,.0f}')
+        if 'Customer Name' in df.columns:
+            top_customers = df.groupby('Customer Name').agg({
+                'Sales': 'sum',
+                'Order ID': 'nunique',
+                'Profit': 'sum'
+            }).nlargest(10, 'Sales').reset_index()
+            
+            top_customers['Avg Order'] = top_customers['Sales'] / top_customers['Order ID']
+            
+            fig_top = go.Figure(data=[
+                go.Bar(
+                    name='Total Spend',
+                    x=top_customers['Customer Name'],
+                    y=top_customers['Sales'],
+                    marker_color='#38bdf8',
+                    text=top_customers['Sales'].apply(lambda x: f'${x:,.0f}'),
+                    textposition='outside'
+                ),
+                go.Scatter(
+                    name='Avg Order Value',
+                    x=top_customers['Customer Name'],
+                    y=top_customers['Avg Order'],
+                    yaxis='y2',
+                    mode='lines+markers',
+                    line=dict(color='#f97316', width=3),
+                    marker=dict(size=8),
+                    text=top_customers['Avg Order'].apply(lambda x: f'${x:,.0f}')
+                )
+            ])
+            
+            fig_top.update_layout(
+                **get_plotly_theme(),
+                height=400,
+                yaxis=dict(title='Total Spend ($)', titlefont=dict(color='#38bdf8')),
+                yaxis2=dict(
+                    title='Avg Order Value ($)',
+                    titlefont=dict(color='#f97316'),
+                    tickfont=dict(color='#f97316'),
+                    overlaying='y',
+                    side='right'
+                ),
+                showlegend=True,
+                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
             )
-        ])
-        
-        fig_top.update_layout(
-            **get_plotly_theme(),
-            height=400,
-            yaxis=dict(title='Total Spend ($)', titlefont=dict(color='#38bdf8')),
-            yaxis2=dict(
-                title='Avg Order Value ($)',
-                titlefont=dict(color='#f97316'),
-                tickfont=dict(color='#f97316'),
-                overlaying='y',
-                side='right'
-            ),
-            showlegend=True,
-            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-        )
-        
-        st.plotly_chart(fig_top, use_container_width=True)
+            
+            st.plotly_chart(fig_top, use_container_width=True)
+        else:
+            st.info("Customer Name column not available")
     
     with col2:
         st.subheader("📊 Customer Purchase Patterns")
@@ -1466,7 +1506,7 @@ def render_export_options(df):
                     df['Profit'].sum(),
                     df['Order ID'].nunique(),
                     df['Sales'].mean(),
-                    (df['Profit'].sum() / df['Sales'].sum() * 100)
+                    (df['Profit'].sum() / df['Sales'].sum() * 100) if df['Sales'].sum() > 0 else 0
                 ]
             })
             summary_csv = summary.to_csv(index=False)
@@ -1520,14 +1560,19 @@ def main():
             st.error("Failed to load data. Please check the data file.")
             st.stop()
 
-    # Sidebar & Filters
-    nav_selection, date_range, regions, categories, segments, search_term = render_sidebar(df)
+    # Render navigation in sidebar
+    nav_selection = render_navigation()
+    
+    # Render filters in sidebar
+    date_range, regions, categories, segments, search_term = render_sidebar_filters(df)
+    
+    # Apply filters
     filtered_df = apply_filters(df, date_range, regions, categories, segments, search_term)
 
     if filtered_df.empty:
         st.warning("⚠️ No data matches your filters. Please adjust your filters.")
         if st.button("Reset Filters"):
-            st.experimental_rerun()
+            st.rerun()
         st.stop()
     
     # Display filter summary

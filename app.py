@@ -357,10 +357,11 @@ with tab3:
         fig_map.update_layout(
             margin={"r": 0, "t": 30, "l": 0, "b": 0},
             coloraxis_colorbar=dict(
-                title="Sales ($)", tickprefix="$", tickformat=",.0f",
+                title=dict(text="Sales ($)", font=dict(color="#a0aec0")),
+                tickprefix="$",
+                tickformat=",.0f",
                 bgcolor="rgba(13,27,42,0.8)",
                 tickfont=dict(color="#a0aec0"),
-                titlefont=dict(color="#a0aec0"),
             ),
         )
         apply_theme(fig_map, height=400, geo=True)

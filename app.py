@@ -413,27 +413,47 @@ with col1:
 
         '</div>'
 
-        # actionable playbook
+        # retention insight panel
         '<div style="background:rgba(255,255,255,0.025);border-radius:12px;overflow:hidden;">'
 
-        # playbook header
+        # panel header
         '<div style="padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.06);'
         'display:flex;align-items:center;justify-content:space-between;">'
-        '<span style="font-size:0.62rem;font-weight:800;letter-spacing:0.16em;color:#b794f4;text-transform:uppercase;">&#127919; Action Playbook</span>'
-        '<span style="font-size:0.6rem;color:#4a5568;">3 steps to ' + untapped_fmt + ' upside</span>'
+        '<span style="font-size:0.62rem;font-weight:800;letter-spacing:0.16em;color:#b794f4;text-transform:uppercase;">&#9889; The Real Opportunity</span>'
+        '<span style="font-size:0.6rem;color:#4a5568;font-style:italic;">Retention, not cross-sell</span>'
+        '</div>'
+
+        # insight summary bar
+        '<div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.04);'
+        'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
+
+        '<div style="text-align:center;">'
+        '<div style="font-size:1.1rem;font-weight:800;color:#faf089;">' + rev_per_fmt + '</div>'
+        '<div style="font-size:0.62rem;color:#718096;margin-top:2px;">avg order value</div>'
+        '</div>'
+
+        '<div style="text-align:center;border-left:1px solid rgba(255,255,255,0.06);border-right:1px solid rgba(255,255,255,0.06);">'
+        '<div style="font-size:1.1rem;font-weight:800;color:#fc8181;">1&#8211;2x</div>'
+        '<div style="font-size:0.62rem;color:#718096;margin-top:2px;">typical purchase freq.</div>'
+        '</div>'
+
+        '<div style="text-align:center;">'
+        '<div style="font-size:1.1rem;font-weight:800;color:#68d391;">+10%</div>'
+        '<div style="font-size:0.62rem;color:#718096;margin-top:2px;">retention = ' + f"${rev_per_order * rev_orders * 0.10:,.0f}" + ' rev</div>'
+        '</div>'
+
         '</div>'
 
         # step 1
         '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.04);">'
         '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(159,122,234,0.2);'
         'border:1px solid rgba(159,122,234,0.5);display:flex;align-items:center;justify-content:center;'
-        'font-size:0.65rem;font-weight:800;color:#b794f4;">1</div>'
+        'font-size:0.65rem;font-weight:800;color:#b794f4;margin-top:1px;">1</div>'
         '<div>'
-        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Bundle at checkout</div>'
+        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Flag lapsing high-value customers</div>'
         '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
-        'Surface <strong style="color:#c9b8f5;">' + rev_name + '</strong> as an add-on when '
-        '<strong style="color:#90cdf4;">' + vol_name + '</strong> hits the cart. '
-        'Even a 5% attach rate adds meaningful revenue per campaign cycle.'
+        'Identify <strong style="color:#c9b8f5;">' + rev_name + '</strong> buyers who haven\'t reordered in 90+ days. '
+        'These are your highest-risk churners — each one lost is ' + rev_per_fmt + ' walking out the door.'
         '</div>'
         '</div>'
         '</div>'
@@ -442,13 +462,12 @@ with col1:
         '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.04);">'
         '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(66,153,225,0.2);'
         'border:1px solid rgba(66,153,225,0.5);display:flex;align-items:center;justify-content:center;'
-        'font-size:0.65rem;font-weight:800;color:#63b3ed;">2</div>'
+        'font-size:0.65rem;font-weight:800;color:#63b3ed;margin-top:1px;">2</div>'
         '<div>'
-        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Target repeat buyers first</div>'
+        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Win them back with an upgrade offer</div>'
         '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
-        'Filter customers with 3+ <strong style="color:#90cdf4;">' + vol_name + '</strong> orders — '
-        'they\'re already loyal. Send a targeted offer for <strong style="color:#c9b8f5;">' + rev_name + '</strong> '
-        'with a time-limited discount to drive first-time trial.'
+        'Run a reactivation campaign — accessories, extended warranty, or a next-gen model offer. '
+        'These buyers already trust the category; the barrier is timing, not intent.'
         '</div>'
         '</div>'
         '</div>'
@@ -457,13 +476,12 @@ with col1:
         '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;">'
         '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(72,187,120,0.2);'
         'border:1px solid rgba(72,187,120,0.5);display:flex;align-items:center;justify-content:center;'
-        'font-size:0.65rem;font-weight:800;color:#68d391;">3</div>'
+        'font-size:0.65rem;font-weight:800;color:#68d391;margin-top:1px;">3</div>'
         '<div>'
-        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Measure cross-sell rate monthly</div>'
+        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Track repeat rate as a KPI</div>'
         '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
-        'Track the % of <strong style="color:#90cdf4;">' + vol_name + '</strong> buyers who also purchase '
-        '<strong style="color:#c9b8f5;">' + rev_name + '</strong> within 30 days. '
-        'Set a baseline this month, then A/B test placement and messaging quarterly.'
+        'Measure % of ' + rev_name + ' buyers who place a second order within 12 months. '
+        'Even lifting that from 20% &#8594; 30% compounds significantly at ' + rev_per_fmt + ' per order.'
         '</div>'
         '</div>'
         '</div>'

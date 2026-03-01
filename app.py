@@ -6,6 +6,7 @@ import numpy as np
 from datetime import datetime
 import warnings
 
+# Ignore warnings for cleaner output
 warnings.filterwarnings("ignore")
 
 # ── Page Configuration ────────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ st.markdown("""
         padding: 20px;
         transition: transform 0.2s;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        height: 100%;
     }
     .metric-card:hover {
         transform: translateY(-2px);
@@ -60,6 +62,27 @@ st.markdown("""
     }
     .insight-box.warn { border-left-color: #fbbf24; }
     .insight-box.danger { border-left-color: #f87171; }
+    .insight-box.good { border-left-color: #4ade80; }
+    
+    /* Revenue Intelligence Card */
+    .revenue-card {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid rgba(159, 122, 234, 0.3);
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .revenue-header {
+        color: #c4b5fd;
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 15px;
+        border-bottom: 1px solid rgba(159, 122, 234, 0.2);
+        padding-bottom: 10px;
+    }
     
     /* Scrollbar */
     ::-webkit-scrollbar { width: 8px; }
@@ -77,7 +100,9 @@ st.markdown("""
 @st.cache_data(ttl=3600)
 def load_data():
     try:
+        # Ensure this file exists in your directory
         df = pd.read_csv('cleaned_train.csv')
+        
         # Ensure date columns are datetime
         df['Order Date'] = pd.to_datetime(df['Order Date'])
         df['Ship Date'] = pd.to_datetime(df['Ship Date'])
@@ -91,9 +116,11 @@ def load_data():
         
         # Check for Profit column (Standard Superstore dataset has it)
         if 'Profit' not in df.columns:
-            df['Profit'] = df['Sales'] * 0.25 # Fallback simulation if missing
-            
-        df['Profit Margin'] = (df['Profit'] / df['Sales']) * 100
+            # Fallback simulation if missing
+            df['Profit'] = df['Sales'] * 0.25 
+            df['Profit Margin'] = 25.0
+        else:
+            df['Profit Margin'] = (df['Profit'] / df['Sales']) * 100
         
         # State Abbreviations
         us_state_to_abbrev = {
@@ -124,19 +151,12 @@ def get_plotly_theme():
             'yaxis': {'gridcolor': '#1e293b', 'linecolor': '#1e293b'},
             'hovermode': 'x unified',
             'hoverlabel': {'bgcolor': '#0f172a', 'font_color': '#f8fafc', 'bordercolor': '#334155'}
-        },
-        'data': {'histogram2dcontour': [{'colorscale': 'Blues'}]}
+        }
     }
 
-# ── Main Application ──────────────────────────────────────────────────────────
+# ── Render Functions ──────────────────────────────────────────────────────────
 
-def main():
-    # Load Data
-    df = load_data()
-    if df.empty:
-        st.stop()
-
-    # Sidebar Configuration
+def render_sidebar(df):
     with st.sidebar:
         st.title("🎛️ Control Center")
         st.markdown("---")
@@ -163,7 +183,6 @@ def main():
             max_value=max_date
         )
         
-        # Multi-selects with 'Select All' logic handled by default=[]
         regions = st.multiselect("Region", options=sorted(df['Region'].unique()), default=[])
         categories = st.multiselect("Category", options=sorted(df['Category'].unique()), default=[])
         segments = st.multiselect("Segment", options=sorted(df['Segment'].unique()), default=[])
@@ -171,8 +190,10 @@ def main():
         st.markdown("---")
         st.caption(f"Data Source: cleaned_train.csv")
         st.caption(f"Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        
+    return nav_selection, date_range, regions, categories, segments
 
-    # Apply Filters
+def apply_filters(df, date_range, regions, categories, segments):
     mask = pd.Series([True] * len(df))
     
     if len(date_range) == 2:
@@ -183,24 +204,50 @@ def main():
     if categories: mask &= df['Category'].isin(categories)
     if segments: mask &= df['Segment'].isin(segments)
     
-    filtered_df = df[mask].copy()
+    return df[mask].copy()
 
-    if filtered_df.empty:
-        st.warning("⚠️ No data matches your filters. Please reset filters.")
-        st.stop()
+def render_revenue_intelligence(df):
+    """Refined version of the original Revenue Intelligence Card"""
+    subcat_stats = df.groupby('Sub-Category').agg({'Sales': 'sum', 'Order ID': 'nunique'}).reset_index()
+    if subcat_stats.empty:
+        return
 
-    # ── Render Content Based on Navigation ────────────────────────────────────
+    subcat_stats['Avg Order Value'] = subcat_stats['Sales'] / subcat_stats['Order ID']
+    top_revenue_sub = subcat_stats.nlargest(1, 'Sales').iloc[0]
+    top_volume_sub  = subcat_stats.nlargest(1, 'Order ID').iloc[0]
+
+    rev_name = str(top_revenue_sub['Sub-Category'])
+    vol_name = str(top_volume_sub['Sub-Category'])
+    rev_per_order = float(top_revenue_sub['Sales']) / float(top_revenue_sub['Order ID'])
+    vol_per_order = float(top_volume_sub['Sales'])  / float(top_volume_sub['Order ID'])
+    multiplier = rev_per_order / vol_per_order if vol_per_order > 0 else 0
     
-    if nav_selection == "Overview":
-        render_overview(filtered_df)
-    elif nav_selection == "Sales Analysis":
-        render_sales_analysis(filtered_df)
-    elif nav_selection == "Product Insights":
-        render_product_insights(filtered_df)
-    elif nav_selection == "Customer Intelligence":
-        render_customer_intelligence(filtered_df)
-    elif nav_selection == "Geographic Map":
-        render_geographic_map(filtered_df)
+    # Avoid division by zero or identical items
+    if rev_name == vol_name:
+        insight_text = f"**{rev_name}** dominates both revenue and volume."
+    else:
+        insight_text = f"**{rev_name}** earns **{multiplier:.1f}x** more per order than **{vol_name}**."
+
+    st.markdown(f"""
+    <div class="revenue-card">
+        <div class="revenue-header">⚡ Revenue Intelligence</div>
+        <div style="color: #f1f5f9; font-size: 1.1rem; margin-bottom: 15px;">
+            {insight_text}
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div style="background: rgba(159, 122, 234, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(159, 122, 234, 0.2);">
+                <div style="color: #c4b5fd; font-size: 0.7rem; text-transform: uppercase;">High Ticket</div>
+                <div style="color: #fff; font-size: 1.4rem; font-weight: bold;">${rev_per_order:,.0f}</div>
+                <div style="color: #94a3b8; font-size: 0.8rem;">{rev_name}</div>
+            </div>
+            <div style="background: rgba(56, 189, 248, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                <div style="color: #7dd3fc; font-size: 0.7rem; text-transform: uppercase;">High Volume</div>
+                <div style="color: #fff; font-size: 1.4rem; font-weight: bold;">${vol_per_order:,.0f}</div>
+                <div style="color: #94a3b8; font-size: 0.8rem;">{vol_name}</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def render_overview(df):
     st.title("📊 Executive Overview")
@@ -225,11 +272,12 @@ def render_overview(df):
         """, unsafe_allow_html=True)
         
     with kpi2:
+        delta_class = "neg" if profit_margin < 15 else ""
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Net Profit</div>
             <div class="metric-value">${total_profit:,.0f}</div>
-            <div class="metric-delta {'neg' if profit_margin < 15 else ''}">{profit_margin:.1f}% Margin</div>
+            <div class="metric-delta {delta_class}">{profit_margin:.1f}% Margin</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -274,6 +322,10 @@ def render_overview(df):
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
         st.plotly_chart(fig_pie, use_container_width=True)
 
+    # Revenue Intelligence Section
+    st.markdown("### 💡 Strategic Insights")
+    render_revenue_intelligence(df)
+
 def render_sales_analysis(df):
     st.title("💰 Sales Deep Dive")
     
@@ -282,9 +334,8 @@ def render_sales_analysis(df):
     with tab1:
         col1, col2 = st.columns(2)
         with col1:
-            # Heatmap of Sales by Day/Hour (Simulated Hour for demo if not present, using Day/Month)
+            # Heatmap of Sales by Day/Month
             pivot_df = df.pivot_table(values='Sales', index='Month_Name', columns='DayOfWeek', aggfunc='sum')
-            # Reorder columns
             day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
             pivot_df = pivot_df.reindex(columns=[d for d in day_order if d in pivot_df.columns])
             
@@ -326,13 +377,11 @@ def render_product_insights(df):
                                  title="Performance Matrix: High Sales & High Margin are the Goal",
                                  color_continuous_scale='Viridis')
         fig_scatter.update_layout(**get_plotly_theme(), height=500)
-        # Add threshold lines
         fig_scatter.add_hline(y=0, line_dash="dash", line_color="red", annotation_text="Break-even")
         st.plotly_chart(fig_scatter, use_container_width=True)
         
     with col2:
         st.subheader("⚠️ Profitability Alerts")
-        # Find negative profit subcategories
         loss_subs = subcat_df[subcat_df['Profit'] < 0]
         
         if not loss_subs.empty:
@@ -346,10 +395,6 @@ def render_product_insights(df):
                 """, unsafe_allow_html=True)
         else:
             st.success("All sub-categories are currently profitable!")
-            
-        st.markdown("---")
-        st.subheader("💡 Strategic Recommendation")
-        st.info("Focus marketing efforts on **Tables** and **Binders** (typically low margin in this dataset) to improve bundle pricing strategies.")
 
 def render_customer_intelligence(df):
     st.title("👥 Customer 360")
@@ -364,29 +409,32 @@ def render_customer_intelligence(df):
     rfm.columns = ['Customer ID', 'LastPurchase', 'Frequency', 'Monetary']
     rfm['Recency'] = (datetime.now() - rfm['LastPurchase']).dt.days
     
-    # Simple Segmentation
-    rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1])
-    rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4])
-    rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4])
-    
-    rfm['Segment'] = rfm['R_Score'].astype(int) + rfm['F_Score'].astype(int) + rfm['M_Score'].astype(int)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🎯 Customer Segments")
-        seg_counts = rfm['Segment'].value_counts().reset_index()
-        seg_counts.columns = ['Score', 'Count']
-        seg_counts['Label'] = seg_counts['Score'].apply(lambda x: "Champions" if x >= 10 else "At Risk" if x <= 5 else "Loyal")
+    # Simple Segmentation with error handling for qcut
+    try:
+        rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1])
+        rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4])
+        rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4])
         
-        fig_seg = px.bar(seg_counts, x='Label', y='Count', color='Count', title="Customer Value Distribution")
-        fig_seg.update_layout(**get_plotly_theme(), height=400)
-        st.plotly_chart(fig_seg, use_container_width=True)
+        rfm['Segment'] = rfm['R_Score'].astype(int) + rfm['F_Score'].astype(int) + rfm['M_Score'].astype(int)
         
-    with col2:
-        st.subheader("💎 Top 10 VIP Customers")
-        top_cust = rfm.sort_values('Monetary', ascending=False).head(10)
-        st.dataframe(top_cust[['Customer ID', 'Monetary', 'Frequency', 'Label']].style.format({'Monetary': '${:,.0f}'}), height=400)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("🎯 Customer Segments")
+            seg_counts = rfm['Segment'].value_counts().reset_index()
+            seg_counts.columns = ['Score', 'Count']
+            seg_counts['Label'] = seg_counts['Score'].apply(lambda x: "Champions" if x >= 10 else "At Risk" if x <= 5 else "Loyal")
+            
+            fig_seg = px.bar(seg_counts, x='Label', y='Count', color='Count', title="Customer Value Distribution")
+            fig_seg.update_layout(**get_plotly_theme(), height=400)
+            st.plotly_chart(fig_seg, use_container_width=True)
+            
+        with col2:
+            st.subheader("💎 Top 10 VIP Customers")
+            top_cust = rfm.sort_values('Monetary', ascending=False).head(10)
+            st.dataframe(top_cust[['Customer ID', 'Monetary', 'Frequency']].style.format({'Monetary': '${:,.0f}'}), height=400)
+    except Exception as e:
+        st.warning(f"RFM Analysis skipped due to data sparsity: {e}")
 
 def render_geographic_map(df):
     st.title("🌍 Geographic Performance")
@@ -416,5 +464,50 @@ def render_geographic_map(df):
             </div>
             """, unsafe_allow_html=True)
 
+def render_download(df):
+    st.markdown("---")
+    col1, col2, col3 = st.columns([2, 2, 2])
+    with col2:
+        csv = df.to_csv(index=False)
+        st.download_button(label="📥 Download Filtered Data (CSV)", data=csv,
+            file_name=f"superstore_sales_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv", use_container_width=True)
+
+# ── Main Application ──────────────────────────────────────────────────────────
+
+def main():
+    # Load Data
+    df = load_data()
+    if df.empty:
+        st.stop()
+
+    # Sidebar & Filters
+    nav_selection, date_range, regions, categories, segments = render_sidebar(df)
+    filtered_df = apply_filters(df, date_range, regions, categories, segments)
+
+    if filtered_df.empty:
+        st.warning("⚠️ No data matches your filters. Please reset filters.")
+        st.stop()
+
+    # ── Render Content Based on Navigation ────────────────────────────────────
+    
+    if nav_selection == "Overview":
+        render_overview(filtered_df)
+    elif nav_selection == "Sales Analysis":
+        render_sales_analysis(filtered_df)
+    elif nav_selection == "Product Insights":
+        render_product_insights(filtered_df)
+    elif nav_selection == "Customer Intelligence":
+        render_customer_intelligence(filtered_df)
+    elif nav_selection == "Geographic Map":
+        render_geographic_map(filtered_df)
+
+    # Download Button (Always visible at bottom)
+    render_download(filtered_df)
+    
+    st.markdown("---")
+    st.markdown('<div style="text-align:center;color:#718096;font-size:0.8rem;padding:20px;">📊 Superstore Analytics Pro • Built with Streamlit</div>', unsafe_allow_html=True)
+
 if __name__ == "__main__":
     main()
+# END OF CODE

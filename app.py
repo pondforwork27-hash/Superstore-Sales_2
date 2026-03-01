@@ -205,18 +205,51 @@ st.markdown(f"""
 def load_data():
     try:
         df = pd.read_csv("cleaned_train.csv")
+
+        # ── Normalise column names: strip whitespace, fix title-case ──────────────
+        # Handles "profit", "PROFIT", " Profit ", "order date", etc.
+        rename_map = {}
+        canonical = {
+            "order date":   "Order Date",
+            "ship date":    "Ship Date",
+            "order id":     "Order ID",
+            "customer id":  "Customer ID",
+            "customer name":"Customer Name",
+            "product id":   "Product ID",
+            "product name": "Product Name",
+            "sub-category": "Sub-Category",
+            "subcategory":  "Sub-Category",
+            "ship mode":    "Ship Mode",
+            "sales":        "Sales",
+            "profit":       "Profit",
+            "discount":     "Discount",
+            "quantity":     "Quantity",
+            "category":     "Category",
+            "segment":      "Segment",
+            "region":       "Region",
+            "state":        "State",
+            "city":         "City",
+            "country":      "Country",
+            "postal code":  "Postal Code",
+        }
+        for col in df.columns:
+            key = col.strip().lower()
+            if key in canonical and col != canonical[key]:
+                rename_map[col] = canonical[key]
+        if rename_map:
+            df = df.rename(columns=rename_map)
+        # ─────────────────────────────────────────────────────────────────────────
+
         df["Order Date"] = pd.to_datetime(df["Order Date"])
         df["Ship Date"]  = pd.to_datetime(df["Ship Date"])
         df["Year"]          = df["Order Date"].dt.year
-        df["Year_str"]      = df["Year"].astype(str)        # string so Plotly colors years discretely
+        df["Year_str"]      = df["Year"].astype(str)
         df["Quarter"]       = df["Order Date"].dt.to_period("Q").astype(str)
         df["Month"]         = df["Order Date"].dt.month
         df["Month_Name"]    = df["Order Date"].dt.strftime("%b")
         df["DayOfWeek"]     = df["Order Date"].dt.day_name()
         df["Shipping_Days"] = (df["Ship Date"] - df["Order Date"]).dt.days
 
-        # ── FIX: never fabricate Profit as Sales*0.25 — that forces every margin to 25% ──
-        # If the column is missing, store real NaN and surface a warning to the user instead.
         has_profit   = "Profit"   in df.columns
         has_discount = "Discount" in df.columns
 
@@ -231,7 +264,6 @@ def load_data():
             np.nan,
         )
 
-        # Store flags so pages can adapt their layout
         df.attrs["has_profit"]   = has_profit
         df.attrs["has_discount"] = has_discount
         return df
@@ -354,6 +386,10 @@ def build_sidebar(df):
         sel_segs = st.multiselect("Segment",   options=sorted(df["Segment"].unique()),  default=[],    placeholder="All segments")
 
         st.markdown("<hr>", unsafe_allow_html=True)
+
+        with st.expander("🔍 Column debug", expanded=False):
+            st.caption("Columns loaded from CSV:")
+            st.code(", ".join(df.columns.tolist()))
 
     fdf = df.copy()
     if sel_years: fdf = fdf[fdf["Year"].isin(sel_years)]

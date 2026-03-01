@@ -3,641 +3,1573 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
-from datetime import datetime
-import streamlit.components.v1 as components
+from datetime import datetime, timedelta
+import warnings
+from streamlit_option_menu import option_menu
+import pytz
 
+# Ignore warnings for cleaner output
+warnings.filterwarnings("ignore")
+
+# ── Page Configuration ────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Superstore Sales Analytics",
-    page_icon="🛒",
+    page_title="Superstore Analytics Pro",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# ── Enhanced CSS with animations ─────────────────────────────────────────────
+# ── Custom CSS & Theme ────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    .main {
-        background: linear-gradient(135deg, #0a0f1a 0%, #0f1a2f 100%);
+    /* Global Background */
+    .stApp {
+        background: linear-gradient(135deg, #0a0f1c 0%, #1a1f2f 100%);
+        color: #e2e8f0;
     }
+    
+    /* Hide Streamlit Branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Cards */
     .metric-card {
-        background: linear-gradient(135deg, #0d1b2a 0%, #1b2a3b 100%);
-        border: 1px solid #2d4a6b;
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(56, 189, 248, 0.1);
         border-radius: 16px;
-        padding: 20px;
+        padding: 24px;
         transition: all 0.3s ease;
+        box-shadow: 0 8px 32px -6px rgba(0, 0, 0, 0.4);
+        height: 100%;
         position: relative;
         overflow: hidden;
     }
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #38bdf8, #8b5cf6);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
     .metric-card:hover {
         transform: translateY(-4px);
-        box-shadow: 0 12px 30px rgba(66,153,225,0.2);
-        border-color: #4299e1;
+        border-color: #38bdf8;
+        box-shadow: 0 20px 40px -12px rgba(56, 189, 248, 0.3);
     }
-    .metric-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #fff;
+    .metric-card:hover::before {
+        opacity: 1;
+    }
+    .metric-label { 
+        font-size: 0.85rem; 
+        color: #94a3b8; 
+        text-transform: uppercase; 
+        letter-spacing: 0.1em; 
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+    .metric-value { 
+        font-size: 2.2rem; 
+        font-weight: 700; 
+        color: #f1f5f9; 
         line-height: 1.2;
+        margin-bottom: 8px;
     }
-    .metric-label {
-        font-size: 0.85rem;
-        color: #a0aec0;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+    .metric-delta { 
+        font-size: 0.85rem; 
+        color: #4ade80; 
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
-    .insight-card {
-        background: linear-gradient(135deg, #0d1b2a 0%, #1b2a3b 100%);
-        border-left: 4px solid #4299e1;
+    .metric-delta.neg { color: #f87171; }
+
+    /* Insight Cards */
+    .insight-box {
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(5px);
+        border-left: 4px solid #38bdf8;
+        padding: 16px 20px;
         border-radius: 12px;
-        padding: 18px 22px;
-        margin-bottom: 12px;
-        color: #f0f0f0;
-        transition: all 0.3s ease;
+        margin-bottom: 16px;
+        transition: transform 0.2s ease;
     }
-    .insight-card:hover {
+    .insight-box:hover {
         transform: translateX(4px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
     }
-    .insight-card.warn { border-left-color: #ed8936; }
-    .insight-card.good { border-left-color: #48bb78; }
-    .insight-card.alert { border-left-color: #e94560; }
-    .insight-icon { font-size: 1.5rem; margin-bottom: 8px; }
-    .insight-label { font-size: 0.75rem; color: #a0aec0; text-transform: uppercase; }
-    .insight-value { font-size: 1.5rem; font-weight: 700; color: #fff; }
-    .insight-detail { font-size: 0.85rem; color: #90cdf4; }
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #0d1b2a; }
-    ::-webkit-scrollbar-thumb { background: #2d4a6b; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #4299e1; }
+    .insight-box.warn { border-left-color: #fbbf24; }
+    .insight-box.danger { border-left-color: #f87171; }
+    .insight-box.good { border-left-color: #4ade80; }
+    
+    /* Revenue Intelligence Card */
+    .revenue-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 20px;
+        padding: 24px;
+        margin-top: 20px;
+        box-shadow: 0 20px 40px -12px rgba(139, 92, 246, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    .revenue-card::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+        animation: pulse 8s ease infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.5; }
+        50% { transform: scale(1.2); opacity: 0.2; }
+    }
+    .revenue-header {
+        color: #c4b5fd;
+        font-size: 1rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        margin-bottom: 20px;
+        border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+        padding-bottom: 12px;
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Table Styling */
+    .dataframe {
+        background: rgba(15, 23, 42, 0.6) !important;
+        border-radius: 12px !important;
+        overflow: hidden;
+    }
+    
+    /* Progress Bar */
+    .stProgress > div > div {
+        background: linear-gradient(90deg, #38bdf8, #8b5cf6) !important;
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: rgba(15, 23, 42, 0.6);
+        padding: 8px;
+        border-radius: 12px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 8px 16px;
+        background: transparent;
+    }
+    .stTabs [aria-selected="true"] {
+        background: rgba(56, 189, 248, 0.2) !important;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #0f172a; border-radius: 5px; }
+    ::-webkit-scrollbar-thumb { 
+        background: linear-gradient(135deg, #334155, #475569);
+        border-radius: 5px; 
+        border: 2px solid #0f172a;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: #5b6b84; }
+    
+    /* Loading Animation */
+    .loading-spinner {
+        border: 3px solid rgba(56, 189, 248, 0.1);
+        border-top-color: #38bdf8;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Data Loading ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=3600)
+# ── Helper Functions ──────────────────────────────────────────────────────────
+
+@st.cache_data(ttl=3600, show_spinner="Loading data...")
 def load_data():
-    df = pd.read_csv('cleaned_train.csv')
-    df['Order Date'] = pd.to_datetime(df['Order Date'])
-    df['Ship Date'] = pd.to_datetime(df['Ship Date'])
-    df['Year'] = df['Order Date'].dt.year
-    df['Month'] = df['Order Date'].dt.month
-    df['Quarter'] = df['Order Date'].dt.quarter
-    df['DayOfWeek'] = df['Order Date'].dt.day_name()
-    df['Month_Year'] = df['Order Date'].dt.strftime('%b %Y')
-    df['Year_Month'] = df['Order Date'].dt.to_period('M')
-    df['Year_Quarter'] = df['Order Date'].dt.to_period('Q').astype(str)
-    df['Shipping_Days'] = (df['Ship Date'] - df['Order Date']).dt.days
-    us_state_to_abbrev = {
-        "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
-        "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
-        "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA",
-        "Kansas": "KS", "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
-        "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS", "Missouri": "MO",
-        "Montana": "MT", "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH", "New Jersey": "NJ",
-        "New Mexico": "NM", "New York": "NY", "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH",
-        "Oklahoma": "OK", "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
-        "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT", "Vermont": "VT",
-        "Virginia": "VA", "Washington": "WA", "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
+    try:
+        # Ensure this file exists in your directory
+        df = pd.read_csv('cleaned_train.csv')
+        
+        # Ensure date columns are datetime
+        df['Order Date'] = pd.to_datetime(df['Order Date'])
+        df['Ship Date'] = pd.to_datetime(df['Ship Date'])
+        
+        # Feature Engineering
+        df['Year'] = df['Order Date'].dt.year
+        df['Month'] = df['Order Date'].dt.month
+        df['Month_Name'] = df['Order Date'].dt.month_name()
+        df['DayOfWeek'] = df['Order Date'].dt.day_name()
+        df['Quarter'] = df['Order Date'].dt.quarter
+        df['Year_Quarter'] = 'Q' + df['Quarter'].astype(str) + ' ' + df['Year'].astype(str)
+        df['Shipping_Days'] = (df['Ship Date'] - df['Order Date']).dt.days
+        
+        # Check for Profit column (Standard Superstore dataset has it)
+        if 'Profit' not in df.columns:
+            # Fallback simulation if missing
+            df['Profit'] = df['Sales'] * 0.25 
+            df['Profit Margin'] = 25.0
+        else:
+            df['Profit Margin'] = (df['Profit'] / df['Sales']) * 100
+        
+        # State Abbreviations
+        us_state_to_abbrev = {
+            "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
+            "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
+            "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA",
+            "Kansas": "KS", "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+            "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS", "Missouri": "MO",
+            "Montana": "MT", "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH", "New Jersey": "NJ",
+            "New Mexico": "NM", "New York": "NY", "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH",
+            "Oklahoma": "OK", "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
+            "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT", "Vermont": "VT",
+            "Virginia": "VA", "Washington": "WA", "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
+        }
+        df['State Code'] = df['State'].map(us_state_to_abbrev)
+        
+        # Add time-based features for forecasting
+        df['Order_Timestamp'] = df['Order Date'].astype(np.int64) // 10**9
+        df['DayOfWeek_Num'] = df['Order Date'].dt.dayofweek
+        df['Is_Weekend'] = df['DayOfWeek_Num'].isin([5, 6]).astype(int)
+        
+        return df
+    except Exception as e:
+        st.error(f"🚨 Critical Error Loading Data: {e}")
+        return pd.DataFrame()
+
+def get_plotly_theme():
+    return {
+        'layout': {
+            'font': {'color': '#e2e8f0', 'family': 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'},
+            'plot_bgcolor': 'rgba(0,0,0,0)',
+            'paper_bgcolor': 'rgba(0,0,0,0)',
+            'xaxis': {
+                'gridcolor': '#1e293b',
+                'linecolor': '#334155',
+                'tickcolor': '#475569',
+                'title_font': {'size': 12},
+                'tickfont': {'size': 11}
+            },
+            'yaxis': {
+                'gridcolor': '#1e293b',
+                'linecolor': '#334155',
+                'tickcolor': '#475569',
+                'title_font': {'size': 12},
+                'tickfont': {'size': 11}
+            },
+            'hovermode': 'x unified',
+            'hoverlabel': {
+                'bgcolor': '#1e293b',
+                'font_color': '#f8fafc',
+                'bordercolor': '#38bdf8',
+                'font_size': 12
+            },
+            'legend': {
+                'font': {'color': '#94a3b8'},
+                'bgcolor': 'rgba(15, 23, 42, 0.6)',
+                'bordercolor': '#334155',
+                'borderwidth': 1
+            },
+            'margin': {'l': 40, 'r': 40, 't': 40, 'b': 40}
+        }
     }
-    df['State Code'] = df['State'].map(us_state_to_abbrev)
-    return df
 
-try:
-    df = load_data()
-except Exception as e:
-    st.error(f"Error loading data: {str(e)}")
-    st.stop()
+def format_currency(value):
+    """Format currency values"""
+    if value >= 1e6:
+        return f"${value/1e6:.1f}M"
+    elif value >= 1e3:
+        return f"${value/1e3:.1f}K"
+    else:
+        return f"${value:,.0f}"
 
-# ── Sidebar Filters ───────────────────────────────────────────────────────────
-st.sidebar.title("🎯 Dashboard Filters")
-st.sidebar.markdown("---")
+def calculate_growth(current, previous):
+    """Calculate growth percentage"""
+    if previous == 0:
+        return 0
+    return ((current - previous) / previous) * 100
 
-min_date = df['Order Date'].min()
-max_date = df['Order Date'].max()
-date_range = st.sidebar.date_input("📅 Date Range", value=[min_date, max_date], min_value=min_date, max_value=max_date)
+# ── Render Functions ──────────────────────────────────────────────────────────
 
-if len(date_range) == 2:
-    start_date, end_date = date_range
-    mask = (df['Order Date'] >= pd.Timestamp(start_date)) & (df['Order Date'] <= pd.Timestamp(end_date))
-else:
-    mask = pd.Series([True] * len(df))
-
-col1, col2 = st.sidebar.columns(2)
-with col1:
-    selected_regions = st.multiselect("🌎 Region", options=sorted(df['Region'].unique()), default=[])
-    selected_segments = st.multiselect("👥 Segment", options=sorted(df['Segment'].unique()), default=[])
-with col2:
-    selected_categories = st.multiselect("📦 Category", options=sorted(df['Category'].unique()), default=[])
-    selected_ship_modes = st.multiselect("🚚 Ship Mode", options=sorted(df['Ship Mode'].unique()), default=[])
-
-if selected_regions: mask &= df['Region'].isin(selected_regions)
-if selected_categories: mask &= df['Category'].isin(selected_categories)
-if selected_segments: mask &= df['Segment'].isin(selected_segments)
-if selected_ship_modes: mask &= df['Ship Mode'].isin(selected_ship_modes)
-
-filtered_df = df[mask].copy()
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 Quick Stats")
-st.sidebar.metric("Total Records", f"{len(filtered_df):,}")
-st.sidebar.metric("Total Sales", f"${filtered_df['Sales'].sum():,.0f}")
-st.sidebar.metric("Unique Orders", f"{filtered_df['Order ID'].nunique():,}")
-st.sidebar.metric("Unique Customers", f"{filtered_df['Customer ID'].nunique():,}")
-
-if filtered_df.empty:
-    st.warning("⚠️ No data matches the selected filters. Please adjust your filters.")
-    st.stop()
-
-# ── Main Dashboard ────────────────────────────────────────────────────────────
-st.title("🛒 Superstore Sales Analytics Dashboard")
-st.markdown(f"*Analyzing {len(filtered_df):,} transactions from {filtered_df['Order Date'].min().strftime('%B %Y')} to {filtered_df['Order Date'].max().strftime('%B %Y')}*")
-
-# ── KPI Row ───────────────────────────────────────────────────────────────────
-col1, col2, col3, col4, col5 = st.columns(5)
-total_sales = filtered_df['Sales'].sum()
-total_orders = filtered_df['Order ID'].nunique()
-avg_order_value = total_sales / total_orders if total_orders > 0 else 0
-total_customers = filtered_df['Customer ID'].nunique()
-avg_shipping = filtered_df['Shipping_Days'].mean()
-
-with col1:
-    st.markdown(f'<div class="metric-card"><div class="metric-label">💰 Total Sales</div><div class="metric-value">${total_sales:,.0f}</div></div>', unsafe_allow_html=True)
-with col2:
-    st.markdown(f'<div class="metric-card"><div class="metric-label">📦 Total Orders</div><div class="metric-value">{total_orders:,}</div></div>', unsafe_allow_html=True)
-with col3:
-    st.markdown(f'<div class="metric-card"><div class="metric-label">🧾 Avg Order Value</div><div class="metric-value">${avg_order_value:,.0f}</div></div>', unsafe_allow_html=True)
-with col4:
-    st.markdown(f'<div class="metric-card"><div class="metric-label">👥 Unique Customers</div><div class="metric-value">{total_customers:,}</div></div>', unsafe_allow_html=True)
-with col5:
-    st.markdown(f'<div class="metric-card"><div class="metric-label">🚚 Avg Shipping</div><div class="metric-value">{avg_shipping:.1f} days</div></div>', unsafe_allow_html=True)
-
-st.markdown("---")
-
-# ── Sales Overview ────────────────────────────────────────────────────────────
-st.header("📈 Sales Overview")
-tab1, tab2, tab3 = st.tabs(["📅 Time Series", "🏷️ Category Analysis", "🌍 Geographic"])
-
-with tab1:
-    col1, col2 = st.columns(2)
-    with col1:
-        monthly_sales = filtered_df.groupby(['Year', 'Month'])['Sales'].sum().reset_index()
-        monthly_sales['Date'] = pd.to_datetime(monthly_sales[['Year', 'Month']].assign(day=1))
-        monthly_sales = monthly_sales.sort_values('Date')
-        fig_monthly = px.line(monthly_sales, x='Date', y='Sales', color='Year',
-            title='Monthly Sales by Year (Year-over-Year Comparison)', markers=True,
-            color_discrete_sequence=['#4299e1', '#48bb78', '#ed8936', '#9f7aea'])
-        fig_monthly.update_traces(line_width=3, marker=dict(size=8),
-            hovertemplate='<b>%{x|%B %Y}</b><br>Sales: $%{y:,.2f}<extra></extra>')
-        fig_monthly.update_layout(xaxis_title='', yaxis_title='Sales ($)', height=400,
-            hovermode='x unified', xaxis=dict(tickformat='%b %Y', tickangle=-45))
-        st.plotly_chart(fig_monthly, use_container_width=True)
-    with col2:
-        quarterly_sales = filtered_df.groupby(['Year', 'Quarter'])['Sales'].sum().reset_index()
-        quarterly_sales['Quarter_Label'] = quarterly_sales['Year'].astype(str) + '-Q' + quarterly_sales['Quarter'].astype(str)
-        quarterly_sales = quarterly_sales.sort_values(['Year', 'Quarter'])
-        fig_quarterly = px.bar(quarterly_sales, x='Quarter_Label', y='Sales',
-            title='Quarterly Sales Performance', color='Sales', color_continuous_scale='Blues')
-        fig_quarterly.update_traces(hovertemplate='<b>%{x}</b><br>Sales: $%{y:,.2f}<extra></extra>')
-        fig_quarterly.update_layout(xaxis_title='', yaxis_title='Sales ($)', height=400,
-            coloraxis_showscale=False, xaxis_tickangle=-45)
-        st.plotly_chart(fig_quarterly, use_container_width=True)
-
-with tab2:
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        cat_sales = filtered_df.groupby('Category')['Sales'].sum().reset_index()
-        fig_cat = px.pie(cat_sales, values='Sales', names='Category', title='Sales by Category',
-            color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1'], hole=0.4)
-        fig_cat.update_traces(textposition='inside', textinfo='percent+label',
-            hovertemplate='<b>%{label}</b><br>Sales: $%{value:,.2f}<br>Share: %{percent}<extra></extra>')
-        fig_cat.update_layout(height=350, showlegend=False)
-        st.plotly_chart(fig_cat, use_container_width=True)
-    with col2:
-        subcat_sales = filtered_df.groupby('Sub-Category')['Sales'].sum().reset_index().nlargest(10, 'Sales')
-        fig_subcat = px.bar(subcat_sales, x='Sales', y='Sub-Category', orientation='h',
-            title='Top 10 Sub-Categories', color='Sales', color_continuous_scale='Blues')
-        fig_subcat.update_traces(hovertemplate='<b>%{y}</b><br>Sales: $%{x:,.2f}<extra></extra>')
-        fig_subcat.update_layout(yaxis={'categoryorder': 'total ascending'}, xaxis_title='Sales ($)',
-            height=350, coloraxis_showscale=False)
-        st.plotly_chart(fig_subcat, use_container_width=True)
-    with col3:
-        seg_sales = filtered_df.groupby('Segment')['Sales'].sum().reset_index()
-        fig_seg = px.bar(seg_sales, x='Segment', y='Sales', title='Sales by Customer Segment',
-            color='Segment', color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1'])
-        fig_seg.update_traces(hovertemplate='<b>%{x}</b><br>Sales: $%{y:,.2f}<extra></extra>')
-        fig_seg.update_layout(xaxis_title='', yaxis_title='Sales ($)', height=350, showlegend=False)
-        st.plotly_chart(fig_seg, use_container_width=True)
-
-with tab3:
-    col1, col2 = st.columns(2)
-    with col1:
-        state_sales = filtered_df.groupby(['State', 'State Code'])['Sales'].sum().reset_index()
-        fig_map = px.choropleth(state_sales, locations='State Code', locationmode="USA-states",
-            color='Sales', scope="usa", hover_name='State',
-            hover_data={'Sales': ':,.2f', 'State Code': False},
-            color_continuous_scale=[[0, '#0d1b2a'], [0.3, '#1e3a5f'], [0.6, '#2b6cb0'], [1, '#90cdf4']],
-            title='Sales by State')
-        fig_map.update_traces(hovertemplate='<b>%{hovertext}</b><br>Sales: $%{z:,.2f}<extra></extra>')
-        fig_map.update_layout(height=400, margin={"r":0,"t":30,"l":0,"b":0},
-            coloraxis_colorbar=dict(title="Sales ($)", tickprefix="$", tickformat=",.0f"))
-        st.plotly_chart(fig_map, use_container_width=True)
-    with col2:
-        top_states = state_sales.nlargest(10, 'Sales')
-        fig_top_states = px.bar(top_states, x='Sales', y='State', orientation='h',
-            title='Top 10 States by Sales', color='Sales', color_continuous_scale='Blues')
-        fig_top_states.update_traces(hovertemplate='<b>%{y}</b><br>Sales: $%{x:,.2f}<extra></extra>')
-        fig_top_states.update_layout(yaxis={'categoryorder': 'total ascending'}, xaxis_title='Sales ($)',
-            height=400, coloraxis_showscale=False)
-        st.plotly_chart(fig_top_states, use_container_width=True)
-
-st.markdown("---")
-
-# ── Shipping Analysis ─────────────────────────────────────────────────────────
-st.header("🚚 Shipping Performance")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    ship_sales = filtered_df.groupby('Ship Mode')['Sales'].sum().reset_index()
-    fig_ship = px.pie(ship_sales, values='Sales', names='Ship Mode', title='Sales by Shipping Mode',
-        color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1', '#90cdf4'])
-    fig_ship.update_traces(textposition='inside', textinfo='percent+label',
-        hovertemplate='<b>%{label}</b><br>Sales: $%{value:,.2f}<br>Share: %{percent}<extra></extra>')
-    fig_ship.update_layout(height=350)
-    st.plotly_chart(fig_ship, use_container_width=True)
-
-with col2:
-    ship_days = filtered_df.groupby('Ship Mode')['Shipping_Days'].mean().reset_index().sort_values('Shipping_Days', ascending=False)
-    fig_ship_days = px.bar(ship_days, x='Ship Mode', y='Shipping_Days', title='Average Shipping Time by Mode',
-        color='Shipping_Days', color_continuous_scale='Blues')
-    fig_ship_days.update_traces(hovertemplate='<b>%{x}</b><br>Avg Shipping: %{y:.1f} days<extra></extra>')
-    fig_ship_days.update_layout(xaxis_title='', yaxis_title='Days', height=350, coloraxis_showscale=False)
-    st.plotly_chart(fig_ship_days, use_container_width=True)
-
-with col3:
-    ship_counts = filtered_df.groupby('Ship Mode')['Order ID'].nunique().reset_index()
-    ship_counts.columns = ['Ship Mode', 'Order Count']
-    ship_counts = ship_counts.sort_values('Order Count', ascending=False)
-    fig_ship_counts = px.bar(ship_counts, x='Ship Mode', y='Order Count', title='Orders by Shipping Mode',
-        color='Order Count', color_continuous_scale='Blues')
-    fig_ship_counts.update_traces(hovertemplate='<b>%{x}</b><br>Orders: %{y:,}<extra></extra>')
-    fig_ship_counts.update_layout(xaxis_title='', yaxis_title='Number of Orders', height=350, coloraxis_showscale=False)
-    st.plotly_chart(fig_ship_counts, use_container_width=True)
-
-st.markdown("---")
-
-# ── Customer Analysis ─────────────────────────────────────────────────────────
-st.header("👥 Customer Insights")
-col1, col2 = st.columns(2)
-
-with col1:
-    customer_sales = filtered_df.groupby('Customer Name').agg({'Sales': 'sum', 'Order ID': 'nunique'}).reset_index()
-    customer_sales.columns = ['Customer', 'Total Sales', 'Order Count']
-    customer_sales = customer_sales.nlargest(10, 'Total Sales')
-    fig_customers = px.bar(customer_sales, x='Total Sales', y='Customer', orientation='h',
-        title='Top 10 Customers by Sales', color='Total Sales', color_continuous_scale='Blues')
-    fig_customers.update_traces(
-        hovertemplate='<b>%{y}</b><br>Total Sales: $%{x:,.2f}<br>Orders: %{customdata[0]:,}<extra></extra>',
-        customdata=customer_sales[['Order Count']])
-    fig_customers.update_layout(yaxis={'categoryorder': 'total ascending'}, xaxis_title='Sales ($)',
-        height=400, coloraxis_showscale=False)
-    st.plotly_chart(fig_customers, use_container_width=True)
-
-with col2:
-    order_freq = filtered_df.groupby('Customer ID')['Order ID'].nunique().reset_index()
-    order_freq.columns = ['Customer ID', 'Order Count']
-    freq_dist = order_freq['Order Count'].value_counts().reset_index()
-    freq_dist.columns = ['Orders per Customer', 'Number of Customers']
-    freq_dist = freq_dist.sort_values('Orders per Customer')
-    fig_freq = px.bar(freq_dist, x='Orders per Customer', y='Number of Customers',
-        title='Customer Order Frequency Distribution', color='Number of Customers', color_continuous_scale='Blues')
-    fig_freq.update_traces(hovertemplate='<b>%{x} order(s) per customer</b><br>Number of Customers: %{y:,}<extra></extra>')
-    fig_freq.update_layout(xaxis_title='Number of Orders', yaxis_title='Number of Customers',
-        height=400, coloraxis_showscale=False)
-    st.plotly_chart(fig_freq, use_container_width=True)
-
-st.markdown("---")
-
-# ── Product Analysis ──────────────────────────────────────────────────────────
-st.header("📦 Product Analysis")
-col1, col2 = st.columns(2)
-
-with col1:
-    subcat_stats = filtered_df.groupby('Sub-Category').agg({'Sales': 'sum', 'Order ID': 'nunique'}).reset_index()
-    subcat_stats['Avg Order Value'] = subcat_stats['Sales'] / subcat_stats['Order ID']
-    subcat_stats = subcat_stats.sort_values('Sales', ascending=False).head(15)
-
-    fig_subcat_perf = px.scatter(subcat_stats, x='Order ID', y='Sales', size='Avg Order Value',
-        color='Sub-Category', title='Sub-Category Performance (Top 15)', hover_name='Sub-Category',
-        labels={'Order ID': 'Number of Orders', 'Sales': 'Total Sales ($)', 'Avg Order Value': 'Average Order Value ($)'},
-        size_max=30)
-    fig_subcat_perf.update_traces(marker=dict(line=dict(width=1, color='white')),
-        hovertemplate='<b>%{hovertext}</b><br>Sales: $%{y:,.2f}<br>Orders: %{x:,.0f}<br>Avg Order: $%{marker.size:,.2f}<extra></extra>')
-    fig_subcat_perf.update_layout(height=500, xaxis_title='Number of Orders', yaxis_title='Total Sales ($)',
-        hoverlabel=dict(bgcolor='#0d1b2a', font_size=12, font_color='white'))
-    st.plotly_chart(fig_subcat_perf, use_container_width=True)
-
-    # ── Redesigned Revenue Intelligence Card ─────────────────────────────────
-    top_revenue_sub = subcat_stats.nlargest(1, 'Sales').iloc[0]
-    top_volume_sub  = subcat_stats.nlargest(1, 'Order ID').iloc[0]
-
-    # Pre-compute all values into plain variables (avoids dict subscript in f-string)
-    rev_name        = str(top_revenue_sub['Sub-Category'])
-    vol_name        = str(top_volume_sub['Sub-Category'])
-    rev_per_order   = float(top_revenue_sub['Sales']) / float(top_revenue_sub['Order ID'])
-    vol_per_order   = float(top_volume_sub['Sales'])  / float(top_volume_sub['Order ID'])
-    multiplier      = rev_per_order / vol_per_order if vol_per_order > 0 else 0
-    rev_orders      = int(top_revenue_sub['Order ID'])
-    vol_orders      = int(top_volume_sub['Order ID'])
-    untapped        = (rev_per_order - vol_per_order) * vol_orders
-
-    rev_per_fmt     = f"${rev_per_order:,.0f}"
-    vol_per_fmt     = f"${vol_per_order:,.0f}"
-    multiplier_fmt  = f"{multiplier:.1f}x"
-    rev_orders_fmt  = f"{rev_orders:,}"
-    vol_orders_fmt  = f"{vol_orders:,}"
-    untapped_fmt    = f"${untapped:,.0f}"
-
-    insight_html = (
-        '<div style="margin-top:20px;background:linear-gradient(135deg,#0d1b2a 0%,#111d2e 60%,#0d1b2a 100%);'
-        'border:1px solid rgba(159,122,234,0.35);border-radius:18px;overflow:hidden;'
-        'box-shadow:0 8px 40px rgba(0,0,0,0.6);position:relative;">'
-
-        # ambient glows
-        '<div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;'
-        'background:radial-gradient(circle,rgba(159,122,234,0.18) 0%,transparent 70%);'
-        'border-radius:50%;pointer-events:none;"></div>'
-        '<div style="position:absolute;bottom:-30px;left:40px;width:120px;height:120px;'
-        'background:radial-gradient(circle,rgba(66,153,225,0.12) 0%,transparent 70%);'
-        'border-radius:50%;pointer-events:none;"></div>'
-
-        # header
-        '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;'
-        'background:linear-gradient(90deg,rgba(159,122,234,0.12) 0%,transparent 100%);'
-        'border-bottom:1px solid rgba(159,122,234,0.2);">'
-        '<span style="font-size:0.62rem;font-weight:800;letter-spacing:0.2em;color:#b794f4;text-transform:uppercase;">'
-        '&#9889; Revenue Intelligence</span>'
-        '<span style="font-size:0.6rem;font-weight:700;letter-spacing:0.1em;color:#0d1b2a;background:#9f7aea;'
-        'padding:3px 9px;border-radius:20px;text-transform:uppercase;">Live</span>'
-        '</div>'
-
-        # body
-        '<div style="padding:18px 20px 20px 20px;position:relative;z-index:1;">'
-
-        # headline
-        '<div style="font-size:1.05rem;font-weight:700;color:#f7fafc;line-height:1.35;margin-bottom:4px;">'
-        '<span style="color:#b794f4;">' + rev_name + '</span> earns '
-        '<span style="display:inline-block;background:rgba(159,122,234,0.15);border:1px solid rgba(159,122,234,0.4);'
-        'color:#e9d8fd;font-size:1rem;font-weight:800;padding:1px 8px;border-radius:6px;margin:0 2px;">'
-        + multiplier_fmt + '</span> '
-        'more per order than <span style="color:#90cdf4;">' + vol_name + '</span>'
-        '</div>'
-        '<div style="font-size:0.75rem;color:#718096;margin-bottom:16px;">'
-        'Two distinct growth engines. One maximises ticket size &#8212; the other, repeat frequency.'
-        '</div>'
-
-        # dual stat cards
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'
-
-        '<div style="background:rgba(159,122,234,0.07);border:1px solid rgba(159,122,234,0.22);border-radius:12px;padding:13px 15px;">'
-        '<div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;color:#b794f4;margin-bottom:5px;font-weight:700;">&#128081; High-Ticket</div>'
-        '<div style="font-size:1.55rem;font-weight:800;color:#fff;line-height:1;font-variant-numeric:tabular-nums;">' + rev_per_fmt + '</div>'
-        '<div style="font-size:0.68rem;color:#a0aec0;margin-top:3px;">per order &nbsp;&middot;&nbsp; ' + rev_orders_fmt + ' orders</div>'
-        '<div style="margin-top:8px;font-size:0.75rem;font-weight:600;color:#e9d8fd;border-top:1px solid rgba(159,122,234,0.15);padding-top:7px;">' + rev_name + '</div>'
-        '</div>'
-
-        '<div style="background:rgba(66,153,225,0.07);border:1px solid rgba(66,153,225,0.22);border-radius:12px;padding:13px 15px;">'
-        '<div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;color:#63b3ed;margin-bottom:5px;font-weight:700;">&#128257; High-Volume</div>'
-        '<div style="font-size:1.55rem;font-weight:800;color:#fff;line-height:1;font-variant-numeric:tabular-nums;">' + vol_per_fmt + '</div>'
-        '<div style="font-size:0.68rem;color:#a0aec0;margin-top:3px;">per order &nbsp;&middot;&nbsp; ' + vol_orders_fmt + ' orders</div>'
-        '<div style="margin-top:8px;font-size:0.75rem;font-weight:600;color:#bee3f8;border-top:1px solid rgba(66,153,225,0.15);padding-top:7px;">' + vol_name + '</div>'
-        '</div>'
-
-        '</div>'
-
-        # retention insight panel
-        '<div style="background:rgba(255,255,255,0.025);border-radius:12px;overflow:hidden;">'
-
-        # panel header
-        '<div style="padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.06);'
-        'display:flex;align-items:center;justify-content:space-between;">'
-        '<span style="font-size:0.62rem;font-weight:800;letter-spacing:0.16em;color:#b794f4;text-transform:uppercase;">&#9889; The Real Opportunity</span>'
-        '<span style="font-size:0.6rem;color:#4a5568;font-style:italic;">Retention, not cross-sell</span>'
-        '</div>'
-
-        # insight summary bar
-        '<div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.04);'
-        'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
-
-        '<div style="text-align:center;">'
-        '<div style="font-size:1.1rem;font-weight:800;color:#faf089;">' + rev_per_fmt + '</div>'
-        '<div style="font-size:0.62rem;color:#718096;margin-top:2px;">avg order value</div>'
-        '</div>'
-
-        '<div style="text-align:center;border-left:1px solid rgba(255,255,255,0.06);border-right:1px solid rgba(255,255,255,0.06);">'
-        '<div style="font-size:1.1rem;font-weight:800;color:#fc8181;">1&#8211;2x</div>'
-        '<div style="font-size:0.62rem;color:#718096;margin-top:2px;">typical purchase freq.</div>'
-        '</div>'
-
-        '<div style="text-align:center;">'
-        '<div style="font-size:1.1rem;font-weight:800;color:#68d391;">+10%</div>'
-        '<div style="font-size:0.62rem;color:#718096;margin-top:2px;">retention = ' + f"${rev_per_order * rev_orders * 0.10:,.0f}" + ' rev</div>'
-        '</div>'
-
-        '</div>'
-
-        # step 1
-        '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.04);">'
-        '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(159,122,234,0.2);'
-        'border:1px solid rgba(159,122,234,0.5);display:flex;align-items:center;justify-content:center;'
-        'font-size:0.65rem;font-weight:800;color:#b794f4;margin-top:1px;">1</div>'
-        '<div>'
-        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Flag lapsing high-value customers</div>'
-        '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
-        'Identify <strong style="color:#c9b8f5;">' + rev_name + '</strong> buyers who haven\'t reordered in 90+ days. '
-        'These are your highest-risk churners — each one lost is ' + rev_per_fmt + ' walking out the door.'
-        '</div>'
-        '</div>'
-        '</div>'
-
-        # step 2
-        '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.04);">'
-        '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(66,153,225,0.2);'
-        'border:1px solid rgba(66,153,225,0.5);display:flex;align-items:center;justify-content:center;'
-        'font-size:0.65rem;font-weight:800;color:#63b3ed;margin-top:1px;">2</div>'
-        '<div>'
-        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Win them back with an upgrade offer</div>'
-        '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
-        'Run a reactivation campaign — accessories, extended warranty, or a next-gen model offer. '
-        'These buyers already trust the category; the barrier is timing, not intent.'
-        '</div>'
-        '</div>'
-        '</div>'
-
-        # step 3
-        '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;">'
-        '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(72,187,120,0.2);'
-        'border:1px solid rgba(72,187,120,0.5);display:flex;align-items:center;justify-content:center;'
-        'font-size:0.65rem;font-weight:800;color:#68d391;margin-top:1px;">3</div>'
-        '<div>'
-        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Track repeat rate as a KPI</div>'
-        '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
-        'Measure % of ' + rev_name + ' buyers who place a second order within 12 months. '
-        'Even lifting that from 20% &#8594; 30% compounds significantly at ' + rev_per_fmt + ' per order.'
-        '</div>'
-        '</div>'
-        '</div>'
-
-        '</div>'
-
-        '</div></div>'
-    )
-    st.markdown(insight_html, unsafe_allow_html=True)
-
-with col2:
-    monthly_segment = filtered_df.groupby(['Year', 'Month', 'Segment'])['Sales'].sum().reset_index()
-    monthly_segment['Date'] = pd.to_datetime(monthly_segment[['Year', 'Month']].assign(day=1))
-    segment_pivot = monthly_segment.pivot(index='Date', columns='Segment', values='Sales').fillna(0)
-    segment_corr = segment_pivot.corr()
-
-    fig_seg_corr = go.Figure(data=go.Heatmap(
-        z=segment_corr.values, x=segment_corr.columns, y=segment_corr.index,
-        colorscale=[[0, '#0d1b2a'], [0.25, '#1e3a5f'], [0.5, '#2b6cb0'], [0.75, '#4299e1'], [1, '#90cdf4']],
-        zmin=0.5, zmax=1.0,
-        text=[[f"{v:.3f}" for v in row] for row in segment_corr.values],
-        texttemplate='%{text}', textfont=dict(size=14, color='white'),
-        hovertemplate='<b>%{y}</b> vs <b>%{x}</b><br>Correlation: %{z:.3f}<extra></extra>'))
-    fig_seg_corr.update_layout(
-        title='Segment Sales Correlation<br><sup>How customer segments move together over time</sup>',
-        height=500, xaxis_title='', yaxis_title='')
-    st.plotly_chart(fig_seg_corr, use_container_width=True)
-
-    segs = segment_corr.columns.tolist()
-    corr_pairs = []
-    for i in range(len(segs)):
-        for j in range(i+1, len(segs)):
-            corr_pairs.append((segs[i], segs[j], segment_corr.iloc[i, j]))
-    corr_pairs.sort(key=lambda x: x[2], reverse=True)
-    strongest = corr_pairs[0] if corr_pairs else None
-    weakest = corr_pairs[-1] if corr_pairs else None
-
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if strongest:
-            st.markdown(f"""
-            <div class="insight-card good" style="margin-top: 10px;">
-                <div class="insight-icon">📈</div>
-                <div class="insight-label">Strongest Correlation</div>
-                <div class="insight-value">{strongest[0]} & {strongest[1]}</div>
-                <div class="insight-detail">r = <strong>{strongest[2]:.3f}</strong> — These segments move together. Campaigns that boost one will likely lift the other.</div>
-            </div>""", unsafe_allow_html=True)
-    with col_b:
-        if weakest:
-            st.markdown(f"""
-            <div class="insight-card warn" style="margin-top: 10px;">
-                <div class="insight-icon">📉</div>
-                <div class="insight-label">Weakest Correlation</div>
-                <div class="insight-value">{weakest[0]} & {weakest[1]}</div>
-                <div class="insight-detail">r = <strong>{weakest[2]:.3f}</strong> — These segments behave independently. Tailored strategies recommended.</div>
-            </div>""", unsafe_allow_html=True)
-
-    # ── Segment trend over time ───────────────────────────────────────────
-    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
-
-    seg_monthly = filtered_df.groupby(['Year', 'Month', 'Segment'])['Sales'].sum().reset_index()
-    seg_monthly['Date'] = pd.to_datetime(seg_monthly[['Year', 'Month']].assign(day=1))
-    seg_monthly = seg_monthly.sort_values('Date')
-
-    fig_seg_trend = px.line(
-        seg_monthly, x='Date', y='Sales', color='Segment',
-        title='Segment Sales Trend Over Time',
-        color_discrete_sequence=['#4299e1', '#9f7aea', '#48bb78'],
-        markers=False
-    )
-    fig_seg_trend.update_traces(line_width=2.5,
-        hovertemplate='<b>%{fullData.name}</b><br>%{x|%b %Y}<br>$%{y:,.0f}<extra></extra>')
-    fig_seg_trend.update_layout(
-        height=240, xaxis_title='', yaxis_title='Sales ($)',
-        legend_title='', hovermode='x unified',
-        margin=dict(t=40, b=10, l=0, r=0),
-        xaxis=dict(tickformat='%b %Y', tickangle=-30)
-    )
-    st.plotly_chart(fig_seg_trend, use_container_width=True)
-
-    # ── Segment share of wallet cards ────────────────────────────────────
-    seg_totals = filtered_df.groupby('Segment')['Sales'].sum()
-    grand_total = seg_totals.sum()
-    seg_colors = {'Consumer': '#4299e1', 'Corporate': '#9f7aea', 'Home Office': '#48bb78'}
-    seg_icons  = {'Consumer': '🛍️', 'Corporate': '🏢', 'Home Office': '🏠'}
-
-    cards_html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;">'
-    for seg, total in seg_totals.sort_values(ascending=False).items():
-        share = total / grand_total * 100
-        color = seg_colors.get(seg, '#4299e1')
-        icon  = seg_icons.get(seg, '📊')
-        cards_html += (
-            f'<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);'
-            f'border-top:3px solid {color};border-radius:10px;padding:10px 12px;text-align:center;">'
-            f'<div style="font-size:1.1rem;">{icon}</div>'
-            f'<div style="font-size:0.62rem;color:#718096;text-transform:uppercase;letter-spacing:0.1em;margin:4px 0 2px;">{seg}</div>'
-            f'<div style="font-size:1.1rem;font-weight:800;color:#fff;">{share:.1f}%</div>'
-            f'<div style="font-size:0.65rem;color:#4a5568;">of total sales</div>'
-            f'<div style="margin-top:6px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;">'
-            f'<div style="height:3px;width:{share:.1f}%;background:{color};border-radius:2px;"></div>'
-            f'</div>'
-            f'</div>'
+def render_sidebar(df):
+    with st.sidebar:
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #38bdf8; font-size: 2rem; margin-bottom: 0;">📊</h1>
+            <h2 style="color: #f1f5f9; font-size: 1.5rem; margin-top: 0;">Analytics Pro</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Navigation with icons
+        selected = option_menu(
+            menu_title=None,
+            options=["Overview", "Sales Analysis", "Product Insights", "Customer Intelligence", "Geographic Map"],
+            icons=["house", "graph-up", "box", "people", "geo-alt"],
+            menu_icon="cast",
+            default_index=0,
+            styles={
+                "container": {"padding": "0!important", "background-color": "transparent"},
+                "icon": {"color": "#38bdf8", "font-size": "18px"},
+                "nav-link": {
+                    "font-size": "14px",
+                    "text-align": "left",
+                    "margin": "4px 0",
+                    "--hover-color": "#1e293b",
+                    "color": "#94a3b8"
+                },
+                "nav-link-selected": {"background-color": "#1e293b", "color": "#38bdf8"},
+            }
         )
-    cards_html += '</div>'
-    st.markdown(cards_html, unsafe_allow_html=True)
+        
+        st.markdown("---")
 
-st.markdown("---")
+        # Filters with better organization
+        st.markdown("### 🔍 Filter Panel")
+        
+        # Date range with quick selects
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📅 This Year", use_container_width=True):
+                current_year = datetime.now().year
+                date_range = [datetime(current_year, 1, 1), datetime(current_year, 12, 31)]
+        with col2:
+            if st.button("📅 Last Year", use_container_width=True):
+                current_year = datetime.now().year
+                date_range = [datetime(current_year-1, 1, 1), datetime(current_year-1, 12, 31)]
+        
+        min_date = df['Order Date'].min()
+        max_date = df['Order Date'].max()
+        
+        date_range = st.date_input(
+            "Custom Range",
+            value=[min_date, max_date],
+            min_value=min_date,
+            max_value=max_date
+        )
+        
+        # Hierarchical filters
+        with st.expander("🏷️ Category Filters", expanded=True):
+            all_categories = st.checkbox("Select All Categories", value=True)
+            if all_categories:
+                categories = []
+            else:
+                categories = st.multiselect(
+                    "Categories",
+                    options=sorted(df['Category'].unique()),
+                    default=[]
+                )
+        
+        with st.expander("📍 Region Filters", expanded=True):
+            all_regions = st.checkbox("Select All Regions", value=True)
+            if all_regions:
+                regions = []
+            else:
+                regions = st.multiselect(
+                    "Regions",
+                    options=sorted(df['Region'].unique()),
+                    default=[]
+                )
+        
+        with st.expander("👥 Segment Filters", expanded=True):
+            all_segments = st.checkbox("Select All Segments", value=True)
+            if all_segments:
+                segments = []
+            else:
+                segments = st.multiselect(
+                    "Segments",
+                    options=sorted(df['Segment'].unique()),
+                    default=[]
+                )
+        
+        # Search box
+        with st.expander("🔎 Search", expanded=False):
+            search_term = st.text_input("Search by Product or Customer", "")
+        
+        # Reset filters button
+        if st.button("🔄 Reset All Filters", use_container_width=True):
+            st.experimental_rerun()
+        
+        st.markdown("---")
+        
+        # Data summary
+        st.markdown("### 📊 Data Summary")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Records", f"{len(df):,}")
+        with col2:
+            st.metric("Date Range", f"{df['Order Date'].min().year}-{df['Order Date'].max().year}")
+        
+        st.markdown("---")
+        st.caption(f"⚡ Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        st.caption("📁 Source: cleaned_train.csv")
+        
+    return selected, date_range, regions, categories, segments, search_term
 
-# ── Regional Analysis ─────────────────────────────────────────────────────────
-st.header("🌎 Regional Performance")
-col1, col2 = st.columns(2)
+def apply_filters(df, date_range, regions, categories, segments, search_term):
+    mask = pd.Series([True] * len(df))
+    
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        mask &= (df['Order Date'] >= pd.Timestamp(start_date)) & (df['Order Date'] <= pd.Timestamp(end_date))
+    
+    if regions: 
+        mask &= df['Region'].isin(regions)
+    if categories: 
+        mask &= df['Category'].isin(categories)
+    if segments: 
+        mask &= df['Segment'].isin(segments)
+    
+    if search_term:
+        mask &= (df['Product Name'].str.contains(search_term, case=False, na=False) | 
+                df['Customer Name'].str.contains(search_term, case=False, na=False))
+    
+    return df[mask].copy()
 
-with col1:
-    region_stats = filtered_df.groupby('Region').agg({'Sales': 'sum', 'Order ID': 'nunique', 'Customer ID': 'nunique'}).reset_index()
-    fig_region = px.bar(region_stats, x='Region', y='Sales', title='Sales by Region',
-        color='Sales', color_continuous_scale='Blues')
-    fig_region.update_traces(
-        hovertemplate='<b>%{x}</b><br>Sales: $%{y:,.2f}<br>Orders: %{customdata[0]:,.0f}<br>Customers: %{customdata[1]:,.0f}<extra></extra>',
-        customdata=region_stats[['Order ID', 'Customer ID']])
-    fig_region.update_layout(xaxis_title='', yaxis_title='Sales ($)', height=400, coloraxis_showscale=False)
-    st.plotly_chart(fig_region, use_container_width=True)
+def render_revenue_intelligence(df):
+    """Enhanced revenue intelligence with more insights"""
+    subcat_stats = df.groupby('Sub-Category').agg({
+        'Sales': 'sum', 
+        'Profit': 'sum',
+        'Order ID': 'nunique',
+        'Quantity': 'sum'
+    }).reset_index()
+    
+    if subcat_stats.empty:
+        return
 
-with col2:
-    region_cat = filtered_df.groupby(['Region', 'Category'])['Sales'].sum().reset_index()
-    fig_region_cat = px.bar(region_cat, x='Region', y='Sales', color='Category',
-        title='Sales by Region and Category', barmode='group',
-        color_discrete_sequence=['#1e3a5f', '#2b6cb0', '#4299e1'])
-    fig_region_cat.update_traces(hovertemplate='<b>%{x}</b><br>Category: %{fullData.name}<br>Sales: $%{y:,.2f}<extra></extra>')
-    fig_region_cat.update_layout(xaxis_title='', yaxis_title='Sales ($)', height=400, legend_title='Category')
-    st.plotly_chart(fig_region_cat, use_container_width=True)
+    subcat_stats['Avg Order Value'] = subcat_stats['Sales'] / subcat_stats['Order ID']
+    subcat_stats['Profit Margin'] = (subcat_stats['Profit'] / subcat_stats['Sales']) * 100
+    
+    top_revenue = subcat_stats.nlargest(1, 'Sales').iloc[0]
+    top_profit = subcat_stats.nlargest(1, 'Profit').iloc[0]
+    top_volume = subcat_stats.nlargest(1, 'Order ID').iloc[0]
+    
+    # Create columns for insights
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+        <div style="background: rgba(56, 189, 248, 0.1); padding: 15px; border-radius: 12px; text-align: center;">
+            <div style="color: #7dd3fc; font-size: 0.8rem; text-transform: uppercase;">Top Revenue</div>
+            <div style="color: #fff; font-size: 1.3rem; font-weight: bold;">{top_revenue['Sub-Category']}</div>
+            <div style="color: #94a3b8; font-size: 0.9rem;">{format_currency(top_revenue['Sales'])}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        margin_color = "#4ade80" if top_profit['Profit Margin'] > 20 else "#fbbf24"
+        st.markdown(f"""
+        <div style="background: rgba(74, 222, 128, 0.1); padding: 15px; border-radius: 12px; text-align: center;">
+            <div style="color: {margin_color}; font-size: 0.8rem; text-transform: uppercase;">Most Profitable</div>
+            <div style="color: #fff; font-size: 1.3rem; font-weight: bold;">{top_profit['Sub-Category']}</div>
+            <div style="color: #94a3b8; font-size: 0.9rem;">{top_profit['Profit Margin']:.1f}% Margin</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div style="background: rgba(168, 85, 247, 0.1); padding: 15px; border-radius: 12px; text-align: center;">
+            <div style="color: #c4b5fd; font-size: 0.8rem; text-transform: uppercase;">Highest Volume</div>
+            <div style="color: #fff; font-size: 1.3rem; font-weight: bold;">{top_volume['Sub-Category']}</div>
+            <div style="color: #94a3b8; font-size: 0.9rem;">{top_volume['Order ID']:,.0f} Orders</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-st.markdown("---")
+def render_overview(df):
+    st.title("📊 Executive Dashboard")
+    
+    # Date context
+    current_date = df['Order Date'].max()
+    previous_period_start = current_date - timedelta(days=365)
+    
+    # Filter data for current and previous periods
+    current_data = df[df['Order Date'] > previous_period_start]
+    previous_data = df[(df['Order Date'] <= previous_period_start) & 
+                       (df['Order Date'] > (previous_period_start - timedelta(days=365)))]
+    
+    # KPIs with growth
+    total_sales = current_data['Sales'].sum()
+    prev_sales = previous_data['Sales'].sum()
+    sales_growth = calculate_growth(total_sales, prev_sales)
+    
+    total_profit = current_data['Profit'].sum()
+    prev_profit = previous_data['Profit'].sum()
+    profit_growth = calculate_growth(total_profit, prev_profit)
+    
+    total_orders = current_data['Order ID'].nunique()
+    prev_orders = previous_data['Order ID'].nunique()
+    orders_growth = calculate_growth(total_orders, prev_orders)
+    
+    avg_shipping = current_data['Shipping_Days'].mean()
+    prev_shipping = previous_data['Shipping_Days'].mean()
+    shipping_improvement = ((prev_shipping - avg_shipping) / prev_shipping) * 100 if prev_shipping > 0 else 0
+    
+    profit_margin = (total_profit / total_sales) * 100 if total_sales > 0 else 0
+    
+    # Metric row
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        delta_color = "normal" if sales_growth >= 0 else "inverse"
+        st.metric(
+            "Total Revenue",
+            format_currency(total_sales),
+            delta=f"{sales_growth:+.1f}%",
+            delta_color=delta_color
+        )
+        
+    with col2:
+        delta_color = "normal" if profit_growth >= 0 else "inverse"
+        st.metric(
+            "Net Profit",
+            format_currency(total_profit),
+            delta=f"{profit_growth:+.1f}%",
+            delta_color=delta_color
+        )
+        
+    with col3:
+        delta_color = "normal" if orders_growth >= 0 else "inverse"
+        st.metric(
+            "Total Orders",
+            f"{total_orders:,}",
+            delta=f"{orders_growth:+.1f}%",
+            delta_color=delta_color
+        )
+        
+    with col4:
+        delta_color = "normal" if shipping_improvement >= 0 else "inverse"
+        st.metric(
+            "Avg Shipping",
+            f"{avg_shipping:.1f} days",
+            delta=f"{shipping_improvement:+.1f}%",
+            delta_color=delta_color,
+            help="Negative delta means faster shipping"
+        )
 
-# ── City Performance Table ────────────────────────────────────────────────────
-st.header("🏙️ Top Cities by Sales")
-city_stats = filtered_df.groupby('City').agg({'Sales': 'sum', 'Order ID': 'nunique', 'Customer ID': 'nunique'}).reset_index()
-city_stats.columns = ['City', 'Total Sales', 'Orders', 'Customers']
-city_stats['Avg Order Value'] = city_stats['Total Sales'] / city_stats['Orders']
-city_stats = city_stats.nlargest(20, 'Total Sales').reset_index(drop=True)
-city_stats.index = range(1, len(city_stats) + 1)
-display_df = city_stats.copy()
-display_df['Total Sales'] = display_df['Total Sales'].apply('${:,.2f}'.format)
-display_df['Avg Order Value'] = display_df['Avg Order Value'].apply('${:,.2f}'.format)
-st.dataframe(display_df, use_container_width=True, height=400,
-    column_config={"City": "City", "Total Sales": "Total Sales", "Orders": "Orders",
-                   "Customers": "Customers", "Avg Order Value": "Avg Order"})
+    st.markdown("---")
+    
+    # Main Charts Row
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("📈 Revenue Trend")
+        
+        # Multiple time aggregations
+        time_period = st.radio(
+            "View by:",
+            ["Monthly", "Quarterly", "Yearly"],
+            horizontal=True,
+            key="time_period"
+        )
+        
+        if time_period == "Monthly":
+            time_group = df['Order Date'].dt.to_period('M')
+        elif time_period == "Quarterly":
+            time_group = df['Year_Quarter']
+        else:
+            time_group = df['Year']
+            
+        trend_data = df.groupby(time_group)['Sales'].agg(['sum', 'count', 'mean']).reset_index()
+        trend_data.columns = ['Period', 'Total Sales', 'Order Count', 'Avg Order Value']
+        
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Scatter(
+            x=trend_data['Period'].astype(str),
+            y=trend_data['Total Sales'],
+            mode='lines+markers',
+            name='Total Sales',
+            line=dict(color='#38bdf8', width=3),
+            marker=dict(size=8, color='#38bdf8', line=dict(color='#fff', width=2))
+        ))
+        fig_trend.add_trace(go.Bar(
+            x=trend_data['Period'].astype(str),
+            y=trend_data['Order Count'],
+            name='Order Count',
+            yaxis='y2',
+            marker_color='rgba(139, 92, 246, 0.3)',
+            marker_line_color='#8b5cf6',
+            marker_line_width=1
+        ))
+        
+        fig_trend.update_layout(
+            **get_plotly_theme(),
+            height=450,
+            yaxis=dict(title='Total Sales ($)', titlefont=dict(color='#38bdf8')),
+            yaxis2=dict(
+                title='Order Count',
+                titlefont=dict(color='#8b5cf6'),
+                tickfont=dict(color='#8b5cf6'),
+                overlaying='y',
+                side='right'
+            ),
+            hovermode='x unified',
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+        )
+        
+        st.plotly_chart(fig_trend, use_container_width=True)
+        
+    with col2:
+        st.subheader("🏷️ Category Performance")
+        
+        cat_data = df.groupby('Category').agg({
+            'Sales': 'sum',
+            'Profit': 'sum'
+        }).reset_index()
+        
+        fig_donut = go.Figure(data=[go.Pie(
+            labels=cat_data['Category'],
+            values=cat_data['Sales'],
+            hole=.6,
+            marker=dict(colors=['#38bdf8', '#8b5cf6', '#f97316']),
+            textinfo='label+percent',
+            textposition='outside',
+            textfont=dict(color='#e2e8f0', size=12),
+            hoverinfo='label+value+percent',
+            hovertemplate='<b>%{label}</b><br>Sales: $%{value:,.0f}<br>Percent: %{percent}<extra></extra>'
+        )])
+        
+        fig_donut.update_layout(
+            **get_plotly_theme(),
+            height=350,
+            showlegend=False,
+            annotations=[dict(
+                text=f'Total<br>${cat_data["Sales"].sum():,.0f}',
+                x=0.5, y=0.5,
+                font=dict(size=14, color='#e2e8f0'),
+                showarrow=False
+            )]
+        )
+        
+        st.plotly_chart(fig_donut, use_container_width=True)
+        
+        # Category metrics
+        for _, row in cat_data.iterrows():
+            margin = (row['Profit'] / row['Sales']) * 100
+            st.markdown(f"""
+            <div style="display: flex; justify-content: space-between; align-items: center; 
+                        padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <span style="color: #94a3b8;">{row['Category']}</span>
+                <span style="color: {'#4ade80' if margin > 15 else '#f87171'}; font-weight: 600;">
+                    {margin:.1f}% margin
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
-# ── Download ──────────────────────────────────────────────────────────────────
-st.markdown("---")
-col1, col2, col3 = st.columns([2, 2, 2])
-with col2:
-    csv = filtered_df.to_csv(index=False)
-    st.download_button(label="📥 Download Filtered Data (CSV)", data=csv,
-        file_name=f"superstore_sales_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv", use_container_width=True)
+    # Revenue Intelligence Section
+    st.markdown("### 💡 Strategic Insights")
+    render_revenue_intelligence(df)
 
-st.markdown("---")
-st.markdown('<div style="text-align:center;color:#718096;font-size:0.8rem;padding:20px;">🛒 Superstore Sales Analytics Dashboard • Built with Streamlit</div>', unsafe_allow_html=True)
+def render_sales_analysis(df):
+    st.title("💰 Sales Analytics")
+    
+    tab1, tab2, tab3 = st.tabs(["📈 Time Series Analysis", "📊 Segment Analysis", "🚚 Shipping Analysis"])
+    
+    with tab1:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📅 Sales Heatmap")
+            
+            # Create pivot table for heatmap
+            heatmap_data = df.pivot_table(
+                values='Sales',
+                index=df['Order Date'].dt.hour,
+                columns=df['Order Date'].dt.dayofweek,
+                aggfunc='mean',
+                fill_value=0
+            )
+            
+            day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            heatmap_data.columns = [day_names[i] for i in heatmap_data.columns]
+            
+            fig_heat = go.Figure(data=go.Heatmap(
+                z=heatmap_data.values,
+                x=heatmap_data.columns,
+                y=heatmap_data.index,
+                colorscale='Viridis',
+                hoverongaps=False,
+                hovertemplate='Day: %{x}<br>Hour: %{y}<br>Avg Sales: $%{z:,.0f}<extra></extra>'
+            ))
+            
+            fig_heat.update_layout(
+                **get_plotly_theme(),
+                height=400,
+                xaxis_title="Day of Week",
+                yaxis_title="Hour of Day",
+                yaxis=dict(autorange='reversed')
+            )
+            
+            st.plotly_chart(fig_heat, use_container_width=True)
+            
+        with col2:
+            st.subheader("📊 Sales Distribution")
+            
+            # Distribution by category over time
+            category_trend = df.groupby([df['Order Date'].dt.to_period('M'), 'Category'])['Sales'].sum().reset_index()
+            category_trend['Order Date'] = category_trend['Order Date'].dt.to_timestamp()
+            
+            fig_area = px.area(
+                category_trend,
+                x='Order Date',
+                y='Sales',
+                color='Category',
+                title="Category Sales Trend"
+            )
+            
+            fig_area.update_layout(
+                **get_plotly_theme(),
+                height=400,
+                showlegend=True,
+                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+            )
+            
+            st.plotly_chart(fig_area, use_container_width=True)
+    
+    with tab2:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("👥 Segment Performance")
+            
+            segment_data = df.groupby('Segment').agg({
+                'Sales': ['sum', 'mean'],
+                'Profit': 'sum',
+                'Order ID': 'nunique'
+            }).round(2)
+            
+            segment_data.columns = ['Total Sales', 'Avg Order Value', 'Total Profit', 'Order Count']
+            segment_data = segment_data.reset_index()
+            segment_data['Profit Margin'] = (segment_data['Total Profit'] / segment_data['Total Sales']) * 100
+            
+            fig_segment = go.Figure()
+            fig_segment.add_trace(go.Bar(
+                x=segment_data['Segment'],
+                y=segment_data['Total Sales'],
+                name='Total Sales',
+                marker_color='#38bdf8',
+                text=segment_data['Total Sales'].apply(lambda x: f'${x/1000:.0f}K'),
+                textposition='outside'
+            ))
+            
+            fig_segment.add_trace(go.Scatter(
+                x=segment_data['Segment'],
+                y=segment_data['Profit Margin'],
+                name='Profit Margin %',
+                yaxis='y2',
+                mode='lines+markers',
+                line=dict(color='#4ade80', width=3),
+                marker=dict(size=10, color='#4ade80'),
+                text=segment_data['Profit Margin'].apply(lambda x: f'{x:.1f}%'),
+                textposition='top center'
+            ))
+            
+            fig_segment.update_layout(
+                **get_plotly_theme(),
+                height=400,
+                yaxis=dict(title='Total Sales ($)', titlefont=dict(color='#38bdf8')),
+                yaxis2=dict(
+                    title='Profit Margin %',
+                    titlefont=dict(color='#4ade80'),
+                    tickfont=dict(color='#4ade80'),
+                    overlaying='y',
+                    side='right',
+                    range=[0, max(segment_data['Profit Margin']) * 1.2]
+                ),
+                showlegend=True,
+                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+            )
+            
+            st.plotly_chart(fig_segment, use_container_width=True)
+            
+        with col2:
+            st.subheader("📊 Correlation Matrix")
+            
+            # Select numeric columns for correlation
+            numeric_cols = ['Sales', 'Profit', 'Quantity', 'Discount', 'Shipping_Days']
+            corr_data = df[numeric_cols].corr()
+            
+            fig_corr = go.Figure(data=go.Heatmap(
+                z=corr_data,
+                x=corr_data.columns,
+                y=corr_data.columns,
+                colorscale='RdBu_r',
+                zmin=-1, zmax=1,
+                text=corr_data.round(2),
+                texttemplate='%{text}',
+                textfont={"color": "#e2e8f0"},
+                hovertemplate='%{x} vs %{y}: %{z:.2f}<extra></extra>'
+            ))
+            
+            fig_corr.update_layout(
+                **get_plotly_theme(),
+                height=400,
+                title="Feature Correlation Analysis"
+            )
+            
+            st.plotly_chart(fig_corr, use_container_width=True)
+    
+    with tab3:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("🚚 Shipping Mode Analysis")
+            
+            ship_data = df.groupby('Ship Mode').agg({
+                'Shipping_Days': ['mean', 'min', 'max'],
+                'Sales': 'sum',
+                'Order ID': 'count'
+            }).round(2)
+            
+            ship_data.columns = ['Avg Days', 'Min Days', 'Max Days', 'Total Sales', 'Order Count']
+            ship_data = ship_data.reset_index()
+            
+            fig_ship = px.bar(
+                ship_data,
+                x='Ship Mode',
+                y='Avg Days',
+                color='Total Sales',
+                text='Avg Days',
+                title="Average Shipping Days by Mode",
+                color_continuous_scale='Viridis',
+                labels={'Avg Days': 'Average Shipping Days'}
+            )
+            
+            fig_ship.update_traces(texttemplate='%{text:.1f} days', textposition='outside')
+            fig_ship.update_layout(**get_plotly_theme(), height=400)
+            
+            st.plotly_chart(fig_ship, use_container_width=True)
+            
+        with col2:
+            st.subheader("📦 Shipping Efficiency")
+            
+            # Calculate efficiency score
+            ship_efficiency = df.groupby('Ship Mode').agg({
+                'Shipping_Days': 'mean',
+                'Sales': 'sum'
+            }).reset_index()
+            
+            ship_efficiency['Efficiency Score'] = (
+                ship_efficiency['Sales'] / ship_efficiency['Shipping_Days']
+            ).round(0)
+            
+            fig_eff = px.scatter(
+                ship_efficiency,
+                x='Shipping_Days',
+                y='Sales',
+                size='Efficiency Score',
+                color='Ship Mode',
+                text='Ship Mode',
+                title="Shipping Efficiency Matrix",
+                size_max=60,
+                labels={'Shipping_Days': 'Avg Shipping Days', 'Sales': 'Total Sales ($)'}
+            )
+            
+            fig_eff.update_traces(textposition='top center')
+            fig_eff.update_layout(**get_plotly_theme(), height=400)
+            
+            st.plotly_chart(fig_eff, use_container_width=True)
 
+def render_product_insights(df):
+    st.title("📦 Product Performance")
+    
+    # Top-level metrics
+    total_products = df['Product ID'].nunique()
+    avg_price = df['Sales'].sum() / df['Quantity'].sum()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Unique Products", f"{total_products:,}")
+    with col2:
+        st.metric("Avg Selling Price", f"${avg_price:.2f}")
+    with col3:
+        st.metric("Total Categories", f"{df['Category'].nunique()}")
+    with col4:
+        st.metric("Total Sub-Categories", f"{df['Sub-Category'].nunique()}")
+    
+    st.markdown("---")
+    
+    tab1, tab2, tab3 = st.tabs(["📊 Category Analysis", "🏆 Top Performers", "⚠️ Profitability Analysis"])
+    
+    with tab1:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Category Performance Matrix")
+            
+            cat_stats = df.groupby(['Category', 'Sub-Category']).agg({
+                'Sales': 'sum',
+                'Profit': 'sum',
+                'Order ID': 'nunique',
+                'Quantity': 'sum'
+            }).reset_index()
+            
+            cat_stats['Profit Margin'] = (cat_stats['Profit'] / cat_stats['Sales']) * 100
+            cat_stats['Avg Order Value'] = cat_stats['Sales'] / cat_stats['Order ID']
+            
+            fig_bubble = px.scatter(
+                cat_stats,
+                x='Sales',
+                y='Profit Margin',
+                size='Avg Order Value',
+                color='Category',
+                hover_name='Sub-Category',
+                size_max=50,
+                labels={'Sales': 'Total Sales ($)', 'Profit Margin': 'Profit Margin (%)'},
+                title="Product Performance Matrix"
+            )
+            
+            fig_bubble.add_hline(y=0, line_dash="dash", line_color="red", opacity=0.3)
+            fig_bubble.add_vline(x=cat_stats['Sales'].median(), line_dash="dash", line_color="yellow", opacity=0.3)
+            
+            fig_bubble.update_layout(**get_plotly_theme(), height=500)
+            st.plotly_chart(fig_bubble, use_container_width=True)
+            
+        with col2:
+            st.subheader("Category Contribution")
+            
+            # Treemap
+            cat_treemap = df.groupby(['Category', 'Sub-Category'])['Sales'].sum().reset_index()
+            
+            fig_treemap = px.treemap(
+                cat_treemap,
+                path=['Category', 'Sub-Category'],
+                values='Sales',
+                color='Sales',
+                color_continuous_scale='Viridis',
+                title="Sales Distribution by Category"
+            )
+            
+            fig_treemap.update_layout(**get_plotly_theme(), height=500)
+            st.plotly_chart(fig_treemap, use_container_width=True)
+    
+    with tab2:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("🏆 Top 10 Products by Sales")
+            
+            top_products = df.groupby('Product Name').agg({
+                'Sales': 'sum',
+                'Quantity': 'sum',
+                'Order ID': 'nunique'
+            }).nlargest(10, 'Sales').reset_index()
+            
+            top_products['Avg Price'] = top_products['Sales'] / top_products['Quantity']
+            
+            fig_top = px.bar(
+                top_products,
+                x='Sales',
+                y='Product Name',
+                orientation='h',
+                color='Quantity',
+                text=top_products['Sales'].apply(lambda x: f'${x/1000:.0f}K'),
+                title="Top Products by Revenue",
+                color_continuous_scale='Viridis',
+                labels={'Sales': 'Total Sales ($)', 'Quantity': 'Units Sold'}
+            )
+            
+            fig_top.update_layout(**get_plotly_theme(), height=500, yaxis={'categoryorder':'total ascending'})
+            fig_top.update_traces(textposition='outside')
+            st.plotly_chart(fig_top, use_container_width=True)
+            
+        with col2:
+            st.subheader("📈 Top Sub-Categories by Growth")
+            
+            # Calculate growth (if we have multiple years)
+            if df['Year'].nunique() > 1:
+                latest_year = df['Year'].max()
+                prev_year = latest_year - 1
+                
+                current = df[df['Year'] == latest_year].groupby('Sub-Category')['Sales'].sum()
+                previous = df[df['Year'] == prev_year].groupby('Sub-Category')['Sales'].sum()
+                
+                growth_data = pd.DataFrame({
+                    'Current': current,
+                    'Previous': previous
+                }).fillna(0)
+                
+                growth_data['Growth'] = ((growth_data['Current'] - growth_data['Previous']) / growth_data['Previous'].replace(0, np.nan)) * 100
+                growth_data = growth_data.nlargest(10, 'Growth').reset_index()
+                
+                fig_growth = px.bar(
+                    growth_data,
+                    x='Growth',
+                    y='Sub-Category',
+                    orientation='h',
+                    color='Growth',
+                    color_continuous_scale='RdYlGn',
+                    title="Top Growing Sub-Categories",
+                    text=growth_data['Growth'].apply(lambda x: f'{x:.1f}%')
+                )
+                
+                fig_growth.update_layout(**get_plotly_theme(), height=500)
+                fig_growth.update_traces(textposition='outside')
+                st.plotly_chart(fig_growth, use_container_width=True)
+            else:
+                st.info("Need multiple years of data for growth analysis")
+    
+    with tab3:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("💰 Profit Margin Analysis")
+            
+            margin_data = df.groupby('Sub-Category')['Profit Margin'].mean().reset_index()
+            margin_data = margin_data.sort_values('Profit Margin', ascending=False)
+            
+            colors = ['#4ade80' if x > 0 else '#f87171' for x in margin_data['Profit Margin']]
+            
+            fig_margin = px.bar(
+                margin_data,
+                x='Profit Margin',
+                y='Sub-Category',
+                orientation='h',
+                title="Average Profit Margin by Sub-Category",
+                color='Profit Margin',
+                color_continuous_scale='RdYlGn',
+                text=margin_data['Profit Margin'].apply(lambda x: f'{x:.1f}%')
+            )
+            
+            fig_margin.update_layout(**get_plotly_theme(), height=500)
+            fig_margin.update_traces(textposition='outside')
+            fig_margin.add_vline(x=0, line_width=2, line_dash="dash", line_color="red")
+            
+            st.plotly_chart(fig_margin, use_container_width=True)
+            
+        with col2:
+            st.subheader("⚠️ Loss-Making Products")
+            
+            loss_products = df[df['Profit'] < 0].groupby('Sub-Category').agg({
+                'Profit': 'sum',
+                'Sales': 'sum',
+                'Order ID': 'count'
+            }).round(2)
+            
+            loss_products = loss_products[loss_products['Profit'] < 0].sort_values('Profit')
+            
+            if not loss_products.empty:
+                loss_products['Loss Margin'] = (loss_products['Profit'] / loss_products['Sales'] * 100).abs()
+                
+                fig_loss = px.bar(
+                    loss_products.reset_index(),
+                    x='Profit',
+                    y='Sub-Category',
+                    orientation='h',
+                    color='Loss Margin',
+                    color_continuous_scale='Reds',
+                    title="Loss by Sub-Category",
+                    text=loss_products['Profit'].apply(lambda x: f'${abs(x):,.0f}')
+                )
+                
+                fig_loss.update_layout(**get_plotly_theme(), height=500)
+                fig_loss.update_traces(textposition='outside')
+                st.plotly_chart(fig_loss, use_container_width=True)
+            else:
+                st.success("🎉 No loss-making products found!")
+
+def render_customer_intelligence(df):
+    st.title("👥 Customer Analytics")
+    
+    # Customer metrics
+    total_customers = df['Customer ID'].nunique()
+    avg_customer_value = df.groupby('Customer ID')['Sales'].sum().mean()
+    repeat_customers = df.groupby('Customer ID')['Order ID'].nunique()
+    repeat_rate = (repeat_customers[repeat_customers > 1].count() / total_customers * 100)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Customers", f"{total_customers:,}")
+    with col2:
+        st.metric("Avg Customer Value", f"${avg_customer_value:,.0f}")
+    with col3:
+        st.metric("Repeat Rate", f"{repeat_rate:.1f}%")
+    with col4:
+        st.metric("Avg Orders/Customer", f"{repeat_customers.mean():.1f}")
+    
+    st.markdown("---")
+    
+    # RFM Analysis
+    st.subheader("🎯 RFM Customer Segmentation")
+    
+    with st.spinner("Calculating RFM scores..."):
+        # Calculate RFM metrics
+        current_date = df['Order Date'].max()
+        
+        rfm = df.groupby('Customer ID').agg({
+            'Order Date': lambda x: (current_date - x.max()).days,
+            'Order ID': 'count',
+            'Sales': 'sum'
+        }).reset_index()
+        
+        rfm.columns = ['Customer ID', 'Recency', 'Frequency', 'Monetary']
+        
+        # Create scores
+        rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1], duplicates='drop')
+        rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4], duplicates='drop')
+        rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4], duplicates='drop')
+        
+        # Convert scores to numeric
+        for col in ['R_Score', 'F_Score', 'M_Score']:
+            rfm[col] = pd.to_numeric(rfm[col])
+        
+        rfm['RFM_Score'] = rfm['R_Score'] + rfm['F_Score'] + rfm['M_Score']
+        
+        # Segment customers
+        def segment_customer(row):
+            if row['RFM_Score'] >= 10:
+                return 'Champions'
+            elif row['RFM_Score'] >= 8:
+                return 'Loyal Customers'
+            elif row['RFM_Score'] >= 6:
+                return 'Potential Loyalists'
+            elif row['RFM_Score'] >= 4:
+                return 'At Risk'
+            else:
+                return 'Lost'
+        
+        rfm['Segment'] = rfm.apply(segment_customer, axis=1)
+        
+        # Display RFM visualization
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # 3D Scatter plot of RFM
+            fig_rfm = px.scatter_3d(
+                rfm,
+                x='Recency',
+                y='Frequency',
+                z='Monetary',
+                color='Segment',
+                hover_name='Customer ID',
+                title="RFM Analysis - 3D Customer Segmentation",
+                labels={'Recency': 'Days Since Last Purchase', 
+                       'Frequency': 'Number of Orders',
+                       'Monetary': 'Total Spend ($)'}
+            )
+            
+            fig_rfm.update_layout(**get_plotly_theme(), height=600)
+            st.plotly_chart(fig_rfm, use_container_width=True)
+            
+        with col2:
+            st.subheader("Segment Distribution")
+            
+            seg_counts = rfm['Segment'].value_counts().reset_index()
+            seg_counts.columns = ['Segment', 'Count']
+            
+            fig_seg = px.pie(
+                seg_counts,
+                values='Count',
+                names='Segment',
+                hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Set3
+            )
+            
+            fig_seg.update_layout(**get_plotly_theme(), height=400)
+            st.plotly_chart(fig_seg, use_container_width=True)
+            
+            # Segment characteristics
+            st.subheader("Segment Characteristics")
+            seg_stats = rfm.groupby('Segment').agg({
+                'Recency': 'mean',
+                'Frequency': 'mean',
+                'Monetary': 'mean',
+                'Customer ID': 'count'
+            }).round(1)
+            
+            seg_stats.columns = ['Avg Recency', 'Avg Frequency', 'Avg Spend', 'Count']
+            seg_stats = seg_stats.sort_values('Avg Spend', ascending=False)
+            
+            st.dataframe(
+                seg_stats.style.format({
+                    'Avg Recency': '{:.0f} days',
+                    'Avg Frequency': '{:.1f}',
+                    'Avg Spend': '${:,.0f}',
+                    'Count': '{:,.0f}'
+                }),
+                use_container_width=True
+            )
+    
+    st.markdown("---")
+    
+    # Top Customers
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("👑 Top 10 Customers by Spend")
+        
+        top_customers = df.groupby('Customer Name').agg({
+            'Sales': 'sum',
+            'Order ID': 'nunique',
+            'Profit': 'sum'
+        }).nlargest(10, 'Sales').reset_index()
+        
+        top_customers['Avg Order'] = top_customers['Sales'] / top_customers['Order ID']
+        
+        fig_top = go.Figure(data=[
+            go.Bar(
+                name='Total Spend',
+                x=top_customers['Customer Name'],
+                y=top_customers['Sales'],
+                marker_color='#38bdf8',
+                text=top_customers['Sales'].apply(lambda x: f'${x:,.0f}'),
+                textposition='outside'
+            ),
+            go.Scatter(
+                name='Avg Order Value',
+                x=top_customers['Customer Name'],
+                y=top_customers['Avg Order'],
+                yaxis='y2',
+                mode='lines+markers',
+                line=dict(color='#f97316', width=3),
+                marker=dict(size=8),
+                text=top_customers['Avg Order'].apply(lambda x: f'${x:,.0f}')
+            )
+        ])
+        
+        fig_top.update_layout(
+            **get_plotly_theme(),
+            height=400,
+            yaxis=dict(title='Total Spend ($)', titlefont=dict(color='#38bdf8')),
+            yaxis2=dict(
+                title='Avg Order Value ($)',
+                titlefont=dict(color='#f97316'),
+                tickfont=dict(color='#f97316'),
+                overlaying='y',
+                side='right'
+            ),
+            showlegend=True,
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+        )
+        
+        st.plotly_chart(fig_top, use_container_width=True)
+    
+    with col2:
+        st.subheader("📊 Customer Purchase Patterns")
+        
+        # Purchase frequency distribution
+        freq_dist = df.groupby('Customer ID')['Order ID'].nunique().value_counts().reset_index()
+        freq_dist.columns = ['Orders', 'Customer Count']
+        freq_dist = freq_dist.sort_values('Orders')
+        
+        fig_freq = px.bar(
+            freq_dist,
+            x='Orders',
+            y='Customer Count',
+            title="Customer Purchase Frequency",
+            labels={'Orders': 'Number of Orders', 'Customer Count': 'Number of Customers'},
+            text='Customer Count'
+        )
+        
+        fig_freq.update_layout(**get_plotly_theme(), height=400)
+        fig_freq.update_traces(textposition='outside')
+        
+        st.plotly_chart(fig_freq, use_container_width=True)
+
+def render_geographic_map(df):
+    st.title("🌍 Geographic Analytics")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Map view selector
+        map_metric = st.radio(
+            "Color Map By:",
+            ["Sales", "Profit", "Order Count"],
+            horizontal=True
+        )
+        
+        # Aggregate by state
+        if map_metric == "Sales":
+            state_data = df.groupby(['State', 'State Code'])['Sales'].sum().reset_index()
+            color_metric = 'Sales'
+            title = "Sales Distribution by State"
+        elif map_metric == "Profit":
+            state_data = df.groupby(['State', 'State Code'])['Profit'].sum().reset_index()
+            color_metric = 'Profit'
+            title = "Profit Distribution by State"
+        else:
+            state_data = df.groupby(['State', 'State Code'])['Order ID'].nunique().reset_index()
+            state_data.columns = ['State', 'State Code', 'Order Count']
+            color_metric = 'Order Count'
+            title = "Order Volume by State"
+        
+        fig_map = px.choropleth(
+            state_data,
+            locations='State Code',
+            locationmode="USA-states",
+            color=color_metric,
+            scope="usa",
+            hover_name='State',
+            color_continuous_scale='Viridis',
+            title=title,
+            labels={color_metric: map_metric}
+        )
+        
+        fig_map.update_layout(
+            **get_plotly_theme(),
+            height=500,
+            geo=dict(
+                scope='usa',
+                projection=go.layout.geo.Projection(type='albers usa'),
+                showlakes=True,
+                lakecolor='rgba(0,0,0,0)',
+                landcolor='rgba(15, 23, 42, 0.8)'
+            )
+        )
+        
+        st.plotly_chart(fig_map, use_container_width=True)
+        
+    with col2:
+        st.subheader("📍 Top States")
+        
+        top_states = state_data.nlargest(5, color_metric).reset_index(drop=True)
+        
+        for idx, row in top_states.iterrows():
+            st.markdown(f"""
+            <div class="metric-card" style="margin-bottom:10px; padding:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="font-weight:bold; font-size:1.1rem;">{row['State']}</span>
+                        <span style="color:#94a3b8; font-size:0.9rem; margin-left:8px;">#{idx+1}</span>
+                    </div>
+                    <span style="color:#38bdf8; font-weight:bold;">
+                        {format_currency(row[color_metric]) if color_metric in ['Sales', 'Profit'] else f'{row[color_metric]:,.0f}'}
+                    </span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # City-level analysis
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🏙️ Top Cities by Sales")
+        
+        city_data = df.groupby('City').agg({
+            'Sales': 'sum',
+            'Profit': 'sum',
+            'Order ID': 'nunique'
+        }).nlargest(10, 'Sales').reset_index()
+        
+        city_data['Margin'] = (city_data['Profit'] / city_data['Sales'] * 100).round(1)
+        
+        fig_cities = px.bar(
+            city_data,
+            x='Sales',
+            y='City',
+            orientation='h',
+            color='Margin',
+            color_continuous_scale='RdYlGn',
+            text=city_data['Sales'].apply(lambda x: f'${x/1000:.0f}K'),
+            title="Top 10 Cities by Revenue"
+        )
+        
+        fig_cities.update_layout(**get_plotly_theme(), height=500)
+        fig_cities.update_traces(textposition='outside')
+        
+        st.plotly_chart(fig_cities, use_container_width=True)
+    
+    with col2:
+        st.subheader("📊 Regional Performance")
+        
+        region_data = df.groupby('Region').agg({
+            'Sales': 'sum',
+            'Profit': 'sum',
+            'Order ID': 'nunique',
+            'State': 'nunique'
+        }).reset_index()
+        
+        region_data['Margin'] = (region_data['Profit'] / region_data['Sales'] * 100).round(1)
+        
+        fig_region = go.Figure()
+        
+        fig_region.add_trace(go.Bar(
+            name='Sales',
+            x=region_data['Region'],
+            y=region_data['Sales'],
+            marker_color='#38bdf8',
+            text=region_data['Sales'].apply(lambda x: f'${x/1000:.0f}K'),
+            textposition='outside'
+        ))
+        
+        fig_region.add_trace(go.Scatter(
+            name='Margin %',
+            x=region_data['Region'],
+            y=region_data['Margin'],
+            yaxis='y2',
+            mode='lines+markers',
+            line=dict(color='#4ade80', width=3),
+            marker=dict(size=10, color='#4ade80'),
+            text=region_data['Margin'].apply(lambda x: f'{x:.1f}%'),
+            textposition='top center'
+        ))
+        
+        fig_region.update_layout(
+            **get_plotly_theme(),
+            height=500,
+            yaxis=dict(title='Total Sales ($)', titlefont=dict(color='#38bdf8')),
+            yaxis2=dict(
+                title='Profit Margin %',
+                titlefont=dict(color='#4ade80'),
+                tickfont=dict(color='#4ade80'),
+                overlaying='y',
+                side='right',
+                range=[0, max(region_data['Margin']) * 1.2]
+            ),
+            showlegend=True,
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+        )
+        
+        st.plotly_chart(fig_region, use_container_width=True)
+
+def render_export_options(df):
+    """Enhanced export functionality"""
+    st.markdown("---")
+    
+    with st.expander("📤 Export Options", expanded=False):
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            # Full data export
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="📥 Full Data (CSV)",
+                data=csv,
+                file_name=f"superstore_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col2:
+            # Summary export
+            summary = pd.DataFrame({
+                'Metric': ['Total Sales', 'Total Profit', 'Total Orders', 'Avg Order Value', 'Profit Margin'],
+                'Value': [
+                    df['Sales'].sum(),
+                    df['Profit'].sum(),
+                    df['Order ID'].nunique(),
+                    df['Sales'].mean(),
+                    (df['Profit'].sum() / df['Sales'].sum() * 100)
+                ]
+            })
+            summary_csv = summary.to_csv(index=False)
+            st.download_button(
+                label="📊 Summary (CSV)",
+                data=summary_csv,
+                file_name=f"superstore_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        with col3:
+            # Excel export (requires openpyxl)
+            try:
+                import io
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                    df.to_excel(writer, sheet_name='Data', index=False)
+                    
+                    # Add summary sheet
+                    summary.to_excel(writer, sheet_name='Summary', index=False)
+                
+                st.download_button(
+                    label="📗 Excel Report",
+                    data=buffer.getvalue(),
+                    file_name=f"superstore_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            except:
+                st.button("📗 Excel (Install openpyxl)", disabled=True, use_container_width=True)
+        
+        with col4:
+            # JSON export
+            json_str = df.to_json(orient='records', date_format='iso')
+            st.download_button(
+                label="📋 JSON Export",
+                data=json_str,
+                file_name=f"superstore_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                use_container_width=True
+            )
+
+# ── Main Application ──────────────────────────────────────────────────────────
+
+def main():
+    # Load Data
+    with st.spinner("Loading data..."):
+        df = load_data()
+        if df.empty:
+            st.error("Failed to load data. Please check the data file.")
+            st.stop()
+
+    # Sidebar & Filters
+    nav_selection, date_range, regions, categories, segments, search_term = render_sidebar(df)
+    filtered_df = apply_filters(df, date_range, regions, categories, segments, search_term)
+
+    if filtered_df.empty:
+        st.warning("⚠️ No data matches your filters. Please adjust your filters.")
+        if st.button("Reset Filters"):
+            st.experimental_rerun()
+        st.stop()
+    
+    # Display filter summary
+    with st.container():
+        st.markdown(f"""
+        <div style="background: rgba(56, 189, 248, 0.1); padding: 10px 20px; border-radius: 12px; margin-bottom: 20px;">
+            <span style="color: #94a3b8;">Showing </span>
+            <span style="color: #38bdf8; font-weight: 600;">{len(filtered_df):,}</span>
+            <span style="color: #94a3b8;"> records from </span>
+            <span style="color: #38bdf8;">{filtered_df['Order Date'].min().strftime('%Y-%m-%d')}</span>
+            <span style="color: #94a3b8;"> to </span>
+            <span style="color: #38bdf8;">{filtered_df['Order Date'].max().strftime('%Y-%m-%d')}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Render Content Based on Navigation ────────────────────────────────────
+    
+    if nav_selection == "Overview":
+        render_overview(filtered_df)
+    elif nav_selection == "Sales Analysis":
+        render_sales_analysis(filtered_df)
+    elif nav_selection == "Product Insights":
+        render_product_insights(filtered_df)
+    elif nav_selection == "Customer Intelligence":
+        render_customer_intelligence(filtered_df)
+    elif nav_selection == "Geographic Map":
+        render_geographic_map(filtered_df)
+
+    # Export Options
+    render_export_options(filtered_df)
+    
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align:center; padding: 20px;">
+        <span style="color:#4b5563;">📊 Superstore Analytics Pro v2.0</span>
+        <span style="color:#374151; margin:0 10px;">•</span>
+        <span style="color:#4b5563;">Built with </span>
+        <span style="color:#ef4444;">❤️</span>
+        <span style="color:#4b5563;"> using Streamlit</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()

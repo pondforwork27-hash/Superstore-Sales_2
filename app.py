@@ -202,22 +202,34 @@ avg_order_val = total_sales / total_orders if total_orders else 0
 total_custs   = filtered_df["Customer ID"].nunique()
 avg_shipping  = filtered_df["Shipping_Days"].mean()
 
-c1, c2, c3, c4, c5 = st.columns(5)
-for col, label, val in [
-    (c1, "💰 Total Sales",      f"${total_sales:,.0f}"),
-    (c2, "📦 Total Orders",     f"{total_orders:,}"),
-    (c3, "🧾 Avg Order Value",  f"${avg_order_val:,.0f}"),
-    (c4, "👥 Unique Customers", f"{total_custs:,}"),
-    (c5, "🚚 Avg Shipping",     f"{avg_shipping:.1f} days"),
-]:
+kpi_data = [
+    ("Total Sales",      f"${total_sales:,.0f}",       "$",  "#4299e1", "↑ Revenue"),
+    ("Total Orders",     f"{total_orders:,}",           "📦", "#48bb78", "Unique orders"),
+    ("Avg Order Value",  f"${avg_order_val:,.0f}",      "$",  "#ed8936", "Per order"),
+    ("Unique Customers", f"{total_custs:,}",            "👤", "#9f7aea", "Buyers"),
+    ("Avg Shipping",     f"{avg_shipping:.1f} days",    "🚚", "#38b2ac", "Fulfillment"),
+]
+
+cols = st.columns(5)
+for col, (label, val, icon, color, sub) in zip(cols, kpi_data):
     with col:
-        st.markdown(
-            f'<div class="metric-card">'
-            f'<div class="metric-label">{label}</div>'
-            f'<div class="metric-value">{val}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"""
+        <div style="
+            border-top: 3px solid {color};
+            border-radius: 4px 4px 12px 12px;
+            background: linear-gradient(160deg, #0d1b2a 0%, #111e2e 100%);
+            padding: 18px 20px 14px;
+            position: relative;
+            overflow: hidden;
+        ">
+            <div style="position:absolute;top:10px;right:14px;font-size:1.6rem;opacity:0.12;">{icon}</div>
+            <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.12em;
+                        text-transform:uppercase;color:{color};margin-bottom:10px;">{label}</div>
+            <div style="font-size:1.75rem;font-weight:800;color:#f7fafc;
+                        line-height:1;font-variant-numeric:tabular-nums;">{val}</div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05);
+                        font-size:0.65rem;color:#4a5568;letter-spacing:0.05em;">{sub}</div>
+        </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
 

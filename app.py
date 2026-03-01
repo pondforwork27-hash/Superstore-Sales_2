@@ -539,6 +539,55 @@ with col2:
                 <div class="insight-detail">r = <strong>{weakest[2]:.3f}</strong> — These segments behave independently. Tailored strategies recommended.</div>
             </div>""", unsafe_allow_html=True)
 
+    # ── Segment trend over time ───────────────────────────────────────────
+    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+
+    seg_monthly = filtered_df.groupby(['Year', 'Month', 'Segment'])['Sales'].sum().reset_index()
+    seg_monthly['Date'] = pd.to_datetime(seg_monthly[['Year', 'Month']].assign(day=1))
+    seg_monthly = seg_monthly.sort_values('Date')
+
+    fig_seg_trend = px.line(
+        seg_monthly, x='Date', y='Sales', color='Segment',
+        title='Segment Sales Trend Over Time',
+        color_discrete_sequence=['#4299e1', '#9f7aea', '#48bb78'],
+        markers=False
+    )
+    fig_seg_trend.update_traces(line_width=2.5,
+        hovertemplate='<b>%{fullData.name}</b><br>%{x|%b %Y}<br>$%{y:,.0f}<extra></extra>')
+    fig_seg_trend.update_layout(
+        height=240, xaxis_title='', yaxis_title='Sales ($)',
+        legend_title='', hovermode='x unified',
+        margin=dict(t=40, b=10, l=0, r=0),
+        xaxis=dict(tickformat='%b %Y', tickangle=-30)
+    )
+    st.plotly_chart(fig_seg_trend, use_container_width=True)
+
+    # ── Segment share of wallet cards ────────────────────────────────────
+    seg_totals = filtered_df.groupby('Segment')['Sales'].sum()
+    grand_total = seg_totals.sum()
+    seg_colors = {'Consumer': '#4299e1', 'Corporate': '#9f7aea', 'Home Office': '#48bb78'}
+    seg_icons  = {'Consumer': '🛍️', 'Corporate': '🏢', 'Home Office': '🏠'}
+
+    cards_html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;">'
+    for seg, total in seg_totals.sort_values(ascending=False).items():
+        share = total / grand_total * 100
+        color = seg_colors.get(seg, '#4299e1')
+        icon  = seg_icons.get(seg, '📊')
+        cards_html += (
+            f'<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);'
+            f'border-top:3px solid {color};border-radius:10px;padding:10px 12px;text-align:center;">'
+            f'<div style="font-size:1.1rem;">{icon}</div>'
+            f'<div style="font-size:0.62rem;color:#718096;text-transform:uppercase;letter-spacing:0.1em;margin:4px 0 2px;">{seg}</div>'
+            f'<div style="font-size:1.1rem;font-weight:800;color:#fff;">{share:.1f}%</div>'
+            f'<div style="font-size:0.65rem;color:#4a5568;">of total sales</div>'
+            f'<div style="margin-top:6px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;">'
+            f'<div style="height:3px;width:{share:.1f}%;background:{color};border-radius:2px;"></div>'
+            f'</div>'
+            f'</div>'
+        )
+    cards_html += '</div>'
+    st.markdown(cards_html, unsafe_allow_html=True)
+
 st.markdown("---")
 
 # ── Regional Analysis ─────────────────────────────────────────────────────────

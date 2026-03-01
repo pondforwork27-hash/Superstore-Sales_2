@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime, timedelta
 import warnings
-import pytz
 
 # Ignore warnings for cleaner output
 warnings.filterwarnings("ignore")
@@ -264,7 +263,6 @@ def load_data():
         df['State Code'] = df['State'].map(us_state_to_abbrev)
         
         # Add time-based features for forecasting
-        df['Order_Timestamp'] = df['Order Date'].astype(np.int64) // 10**9
         df['DayOfWeek_Num'] = df['Order Date'].dt.dayofweek
         df['Is_Weekend'] = df['DayOfWeek_Num'].isin([5, 6]).astype(int)
         
@@ -273,40 +271,37 @@ def load_data():
         st.error(f"🚨 Critical Error Loading Data: {e}")
         return pd.DataFrame()
 
-def get_plotly_theme():
+def get_plotly_layout():
+    """Return base layout configuration for plotly charts"""
     return {
-        'layout': {
-            'font': {'color': '#e2e8f0', 'family': 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'},
-            'plot_bgcolor': 'rgba(0,0,0,0)',
-            'paper_bgcolor': 'rgba(0,0,0,0)',
-            'xaxis': {
-                'gridcolor': '#1e293b',
-                'linecolor': '#334155',
-                'tickcolor': '#475569',
-                'title_font': {'size': 12},
-                'tickfont': {'size': 11}
-            },
-            'yaxis': {
-                'gridcolor': '#1e293b',
-                'linecolor': '#334155',
-                'tickcolor': '#475569',
-                'title_font': {'size': 12},
-                'tickfont': {'size': 11}
-            },
-            'hovermode': 'x unified',
-            'hoverlabel': {
-                'bgcolor': '#1e293b',
-                'font_color': '#f8fafc',
-                'bordercolor': '#38bdf8',
-                'font_size': 12
-            },
-            'legend': {
-                'font': {'color': '#94a3b8'},
-                'bgcolor': 'rgba(15, 23, 42, 0.6)',
-                'bordercolor': '#334155',
-                'borderwidth': 1
-            },
-            'margin': {'l': 40, 'r': 40, 't': 40, 'b': 40}
+        'font': {'color': '#e2e8f0', 'family': 'sans-serif'},
+        'plot_bgcolor': 'rgba(0,0,0,0)',
+        'paper_bgcolor': 'rgba(0,0,0,0)',
+        'xaxis': {
+            'gridcolor': '#1e293b',
+            'linecolor': '#334155',
+            'tickcolor': '#475569',
+            'title_font': {'size': 12, 'color': '#94a3b8'},
+            'tickfont': {'size': 11, 'color': '#94a3b8'}
+        },
+        'yaxis': {
+            'gridcolor': '#1e293b',
+            'linecolor': '#334155',
+            'tickcolor': '#475569',
+            'title_font': {'size': 12, 'color': '#94a3b8'},
+            'tickfont': {'size': 11, 'color': '#94a3b8'}
+        },
+        'hoverlabel': {
+            'bgcolor': '#1e293b',
+            'font_color': '#f8fafc',
+            'bordercolor': '#38bdf8',
+            'font_size': 12
+        },
+        'legend': {
+            'font': {'color': '#94a3b8', 'size': 11},
+            'bgcolor': 'rgba(15, 23, 42, 0.6)',
+            'bordercolor': '#334155',
+            'borderwidth': 1
         }
     }
 
@@ -464,10 +459,15 @@ def apply_filters(df, date_range, regions, categories, segments, search_term):
     
     if search_term:
         # Check if columns exist before searching
+        product_mask = pd.Series([False] * len(df))
+        customer_mask = pd.Series([False] * len(df))
+        
         if 'Product Name' in df.columns:
-            mask &= df['Product Name'].str.contains(search_term, case=False, na=False)
+            product_mask = df['Product Name'].str.contains(search_term, case=False, na=False)
         if 'Customer Name' in df.columns:
-            mask &= df['Customer Name'].str.contains(search_term, case=False, na=False)
+            customer_mask = df['Customer Name'].str.contains(search_term, case=False, na=False)
+        
+        mask &= (product_mask | customer_mask)
     
     return df[mask].copy()
 
@@ -477,7 +477,7 @@ def render_revenue_intelligence(df):
         'Sales': 'sum', 
         'Profit': 'sum',
         'Order ID': 'nunique',
-        'Quantity': 'sum'
+        'Quantity': 'sum' if 'Quantity' in df.columns else 'count'
     }).reset_index()
     
     if subcat_stats.empty:
@@ -550,8 +550,6 @@ def render_overview(df):
     prev_shipping = previous_data['Shipping_Days'].mean()
     shipping_improvement = ((prev_shipping - avg_shipping) / prev_shipping) * 100 if prev_shipping > 0 else 0
     
-    profit_margin = (total_profit / total_sales) * 100 if total_sales > 0 else 0
-    
     # Metric row
     col1, col2, col3, col4 = st.columns(4)
     
@@ -609,18 +607,30 @@ def render_overview(df):
         )
         
         if time_period == "Monthly":
-            time_group = df['Order Date'].dt.to_period('M')
+            df['Period'] = df['Order Date'].dt.to_period('M').astype(str)
+            trend_data = df.groupby('Period').agg({
+                'Sales': 'sum',
+                'Order ID': 'count'
+            }).reset_index()
         elif time_period == "Quarterly":
-            time_group = df['Year_Quarter']
+            trend_data = df.groupby('Year_Quarter').agg({
+                'Sales': 'sum',
+                'Order ID': 'count'
+            }).reset_index()
+            trend_data = trend_data.rename(columns={'Year_Quarter': 'Period'})
         else:
-            time_group = df['Year']
-            
-        trend_data = df.groupby(time_group)['Sales'].agg(['sum', 'count', 'mean']).reset_index()
-        trend_data.columns = ['Period', 'Total Sales', 'Order Count', 'Avg Order Value']
+            trend_data = df.groupby('Year').agg({
+                'Sales': 'sum',
+                'Order ID': 'count'
+            }).reset_index()
+            trend_data = trend_data.rename(columns={'Year': 'Period'})
+            trend_data['Period'] = trend_data['Period'].astype(str)
+        
+        trend_data.columns = ['Period', 'Total Sales', 'Order Count']
         
         fig_trend = go.Figure()
         fig_trend.add_trace(go.Scatter(
-            x=trend_data['Period'].astype(str),
+            x=trend_data['Period'],
             y=trend_data['Total Sales'],
             mode='lines+markers',
             name='Total Sales',
@@ -628,7 +638,7 @@ def render_overview(df):
             marker=dict(size=8, color='#38bdf8', line=dict(color='#fff', width=2))
         ))
         fig_trend.add_trace(go.Bar(
-            x=trend_data['Period'].astype(str),
+            x=trend_data['Period'],
             y=trend_data['Order Count'],
             name='Order Count',
             yaxis='y2',
@@ -637,21 +647,22 @@ def render_overview(df):
             marker_line_width=1
         ))
         
-        fig_trend.update_layout(
-            **get_plotly_theme(),
-            height=450,
-            yaxis=dict(title='Total Sales ($)', titlefont=dict(color='#38bdf8')),
-            yaxis2=dict(
-                title='Order Count',
-                titlefont=dict(color='#8b5cf6'),
-                tickfont=dict(color='#8b5cf6'),
-                overlaying='y',
-                side='right'
-            ),
-            hovermode='x unified',
-            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-        )
+        layout = get_plotly_layout()
+        layout.update({
+            'height': 450,
+            'yaxis': {'title': 'Total Sales ($)', 'titlefont': {'color': '#38bdf8'}},
+            'yaxis2': {
+                'title': 'Order Count',
+                'titlefont': {'color': '#8b5cf6'},
+                'tickfont': {'color': '#8b5cf6'},
+                'overlaying': 'y',
+                'side': 'right'
+            },
+            'hovermode': 'x unified',
+            'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+        })
         
+        fig_trend.update_layout(layout)
         st.plotly_chart(fig_trend, use_container_width=True)
         
     with col2:
@@ -670,22 +681,22 @@ def render_overview(df):
             textinfo='label+percent',
             textposition='outside',
             textfont=dict(color='#e2e8f0', size=12),
-            hoverinfo='label+value+percent',
             hovertemplate='<b>%{label}</b><br>Sales: $%{value:,.0f}<br>Percent: %{percent}<extra></extra>'
         )])
         
-        fig_donut.update_layout(
-            **get_plotly_theme(),
-            height=350,
-            showlegend=False,
-            annotations=[dict(
+        layout = get_plotly_layout()
+        layout.update({
+            'height': 350,
+            'showlegend': False,
+            'annotations': [dict(
                 text=f'Total<br>${cat_data["Sales"].sum():,.0f}',
                 x=0.5, y=0.5,
                 font=dict(size=14, color='#e2e8f0'),
                 showarrow=False
             )]
-        )
+        })
         
+        fig_donut.update_layout(layout)
         st.plotly_chart(fig_donut, use_container_width=True)
         
         # Category metrics
@@ -717,16 +728,17 @@ def render_sales_analysis(df):
             st.subheader("📅 Sales Heatmap")
             
             # Create pivot table for heatmap
+            df['Hour'] = df['Order Date'].dt.hour
             heatmap_data = df.pivot_table(
                 values='Sales',
-                index=df['Order Date'].dt.hour,
-                columns=df['Order Date'].dt.dayofweek,
+                index='Hour',
+                columns='DayOfWeek',
                 aggfunc='mean',
                 fill_value=0
             )
             
-            day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            heatmap_data.columns = [day_names[i] for i in heatmap_data.columns]
+            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            heatmap_data = heatmap_data.reindex(columns=[d for d in day_order if d in heatmap_data.columns])
             
             fig_heat = go.Figure(data=go.Heatmap(
                 z=heatmap_data.values,
@@ -737,38 +749,40 @@ def render_sales_analysis(df):
                 hovertemplate='Day: %{x}<br>Hour: %{y}<br>Avg Sales: $%{z:,.0f}<extra></extra>'
             ))
             
-            fig_heat.update_layout(
-                **get_plotly_theme(),
-                height=400,
-                xaxis_title="Day of Week",
-                yaxis_title="Hour of Day",
-                yaxis=dict(autorange='reversed')
-            )
+            layout = get_plotly_layout()
+            layout.update({
+                'height': 400,
+                'xaxis_title': "Day of Week",
+                'yaxis_title': "Hour of Day",
+                'yaxis': {'autorange': 'reversed'}
+            })
             
+            fig_heat.update_layout(layout)
             st.plotly_chart(fig_heat, use_container_width=True)
             
         with col2:
             st.subheader("📊 Sales Distribution")
             
             # Distribution by category over time
-            category_trend = df.groupby([df['Order Date'].dt.to_period('M'), 'Category'])['Sales'].sum().reset_index()
-            category_trend['Order Date'] = category_trend['Order Date'].dt.to_timestamp()
+            df['YearMonth'] = df['Order Date'].dt.to_period('M').astype(str)
+            category_trend = df.groupby(['YearMonth', 'Category'])['Sales'].sum().reset_index()
             
             fig_area = px.area(
                 category_trend,
-                x='Order Date',
+                x='YearMonth',
                 y='Sales',
                 color='Category',
                 title="Category Sales Trend"
             )
             
-            fig_area.update_layout(
-                **get_plotly_theme(),
-                height=400,
-                showlegend=True,
-                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-            )
+            layout = get_plotly_layout()
+            layout.update({
+                'height': 400,
+                'showlegend': True,
+                'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+            })
             
+            fig_area.update_layout(layout)
             st.plotly_chart(fig_area, use_container_width=True)
     
     with tab2:
@@ -809,22 +823,23 @@ def render_sales_analysis(df):
                 textposition='top center'
             ))
             
-            fig_segment.update_layout(
-                **get_plotly_theme(),
-                height=400,
-                yaxis=dict(title='Total Sales ($)', titlefont=dict(color='#38bdf8')),
-                yaxis2=dict(
-                    title='Profit Margin %',
-                    titlefont=dict(color='#4ade80'),
-                    tickfont=dict(color='#4ade80'),
-                    overlaying='y',
-                    side='right',
-                    range=[0, max(segment_data['Profit Margin']) * 1.2]
-                ),
-                showlegend=True,
-                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-            )
+            layout = get_plotly_layout()
+            layout.update({
+                'height': 400,
+                'yaxis': {'title': 'Total Sales ($)', 'titlefont': {'color': '#38bdf8'}},
+                'yaxis2': {
+                    'title': 'Profit Margin %',
+                    'titlefont': {'color': '#4ade80'},
+                    'tickfont': {'color': '#4ade80'},
+                    'overlaying': 'y',
+                    'side': 'right',
+                    'range': [0, max(segment_data['Profit Margin']) * 1.2 if not segment_data.empty else 100]
+                },
+                'showlegend': True,
+                'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+            })
             
+            fig_segment.update_layout(layout)
             st.plotly_chart(fig_segment, use_container_width=True)
             
         with col2:
@@ -832,27 +847,29 @@ def render_sales_analysis(df):
             
             # Select numeric columns for correlation
             numeric_cols = ['Sales', 'Profit', 'Quantity', 'Discount', 'Shipping_Days']
-            corr_data = df[numeric_cols].corr()
+            available_cols = [col for col in numeric_cols if col in df.columns]
             
-            fig_corr = go.Figure(data=go.Heatmap(
-                z=corr_data,
-                x=corr_data.columns,
-                y=corr_data.columns,
-                colorscale='RdBu_r',
-                zmin=-1, zmax=1,
-                text=corr_data.round(2),
-                texttemplate='%{text}',
-                textfont={"color": "#e2e8f0"},
-                hovertemplate='%{x} vs %{y}: %{z:.2f}<extra></extra>'
-            ))
-            
-            fig_corr.update_layout(
-                **get_plotly_theme(),
-                height=400,
-                title="Feature Correlation Analysis"
-            )
-            
-            st.plotly_chart(fig_corr, use_container_width=True)
+            if len(available_cols) > 1:
+                corr_data = df[available_cols].corr()
+                
+                fig_corr = go.Figure(data=go.Heatmap(
+                    z=corr_data,
+                    x=corr_data.columns,
+                    y=corr_data.columns,
+                    colorscale='RdBu_r',
+                    zmin=-1, zmax=1,
+                    text=corr_data.round(2),
+                    texttemplate='%{text}',
+                    textfont={"color": "#e2e8f0"},
+                    hovertemplate='%{x} vs %{y}: %{z:.2f}<extra></extra>'
+                ))
+                
+                layout = get_plotly_layout()
+                layout.update({'height': 400, 'title': "Feature Correlation Analysis"})
+                fig_corr.update_layout(layout)
+                st.plotly_chart(fig_corr, use_container_width=True)
+            else:
+                st.info("Not enough numeric columns for correlation analysis")
     
     with tab3:
         col1, col2 = st.columns(2)
@@ -881,7 +898,10 @@ def render_sales_analysis(df):
             )
             
             fig_ship.update_traces(texttemplate='%{text:.1f} days', textposition='outside')
-            fig_ship.update_layout(**get_plotly_theme(), height=400)
+            
+            layout = get_plotly_layout()
+            layout.update({'height': 400})
+            fig_ship.update_layout(layout)
             
             st.plotly_chart(fig_ship, use_container_width=True)
             
@@ -911,7 +931,10 @@ def render_sales_analysis(df):
             )
             
             fig_eff.update_traces(textposition='top center')
-            fig_eff.update_layout(**get_plotly_theme(), height=400)
+            
+            layout = get_plotly_layout()
+            layout.update({'height': 400})
+            fig_eff.update_layout(layout)
             
             st.plotly_chart(fig_eff, use_container_width=True)
 
@@ -920,7 +943,7 @@ def render_product_insights(df):
     
     # Top-level metrics
     total_products = df['Product ID'].nunique() if 'Product ID' in df.columns else 0
-    avg_price = df['Sales'].sum() / df['Quantity'].sum() if 'Quantity' in df.columns else 0
+    avg_price = df['Sales'].sum() / df['Quantity'].sum() if 'Quantity' in df.columns and df['Quantity'].sum() > 0 else 0
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -967,7 +990,9 @@ def render_product_insights(df):
             fig_bubble.add_hline(y=0, line_dash="dash", line_color="red", opacity=0.3)
             fig_bubble.add_vline(x=cat_stats['Sales'].median(), line_dash="dash", line_color="yellow", opacity=0.3)
             
-            fig_bubble.update_layout(**get_plotly_theme(), height=500)
+            layout = get_plotly_layout()
+            layout.update({'height': 500})
+            fig_bubble.update_layout(layout)
             st.plotly_chart(fig_bubble, use_container_width=True)
             
         with col2:
@@ -985,7 +1010,9 @@ def render_product_insights(df):
                 title="Sales Distribution by Category"
             )
             
-            fig_treemap.update_layout(**get_plotly_theme(), height=500)
+            layout = get_plotly_layout()
+            layout.update({'height': 500})
+            fig_treemap.update_layout(layout)
             st.plotly_chart(fig_treemap, use_container_width=True)
     
     with tab2:
@@ -1001,21 +1028,24 @@ def render_product_insights(df):
                     'Order ID': 'nunique'
                 }).nlargest(10, 'Sales').reset_index()
                 
-                top_products['Avg Price'] = top_products['Sales'] / top_products['Quantity']
+                if 'Quantity' in top_products.columns:
+                    top_products['Avg Price'] = top_products['Sales'] / top_products['Quantity']
                 
                 fig_top = px.bar(
                     top_products,
                     x='Sales',
                     y='Product Name',
                     orientation='h',
-                    color='Quantity',
+                    color='Quantity' if 'Quantity' in top_products.columns else 'Order ID',
                     text=top_products['Sales'].apply(lambda x: f'${x/1000:.0f}K'),
                     title="Top Products by Revenue",
                     color_continuous_scale='Viridis',
                     labels={'Sales': 'Total Sales ($)', 'Quantity': 'Units Sold'}
                 )
                 
-                fig_top.update_layout(**get_plotly_theme(), height=500, yaxis={'categoryorder':'total ascending'})
+                layout = get_plotly_layout()
+                layout.update({'height': 500, 'yaxis': {'categoryorder': 'total ascending'}})
+                fig_top.update_layout(layout)
                 fig_top.update_traces(textposition='outside')
                 st.plotly_chart(fig_top, use_container_width=True)
             else:
@@ -1051,7 +1081,9 @@ def render_product_insights(df):
                     text=growth_data['Growth'].apply(lambda x: f'{x:.1f}%')
                 )
                 
-                fig_growth.update_layout(**get_plotly_theme(), height=500)
+                layout = get_plotly_layout()
+                layout.update({'height': 500})
+                fig_growth.update_layout(layout)
                 fig_growth.update_traces(textposition='outside')
                 st.plotly_chart(fig_growth, use_container_width=True)
             else:
@@ -1066,8 +1098,6 @@ def render_product_insights(df):
             margin_data = df.groupby('Sub-Category')['Profit Margin'].mean().reset_index()
             margin_data = margin_data.sort_values('Profit Margin', ascending=False)
             
-            colors = ['#4ade80' if x > 0 else '#f87171' for x in margin_data['Profit Margin']]
-            
             fig_margin = px.bar(
                 margin_data,
                 x='Profit Margin',
@@ -1079,7 +1109,9 @@ def render_product_insights(df):
                 text=margin_data['Profit Margin'].apply(lambda x: f'{x:.1f}%')
             )
             
-            fig_margin.update_layout(**get_plotly_theme(), height=500)
+            layout = get_plotly_layout()
+            layout.update({'height': 500})
+            fig_margin.update_layout(layout)
             fig_margin.update_traces(textposition='outside')
             fig_margin.add_vline(x=0, line_width=2, line_dash="dash", line_color="red")
             
@@ -1110,7 +1142,9 @@ def render_product_insights(df):
                     text=loss_products['Profit'].apply(lambda x: f'${abs(x):,.0f}')
                 )
                 
-                fig_loss.update_layout(**get_plotly_theme(), height=500)
+                layout = get_plotly_layout()
+                layout.update({'height': 500})
+                fig_loss.update_layout(layout)
                 fig_loss.update_traces(textposition='outside')
                 st.plotly_chart(fig_loss, use_container_width=True)
             else:
@@ -1121,9 +1155,15 @@ def render_customer_intelligence(df):
     
     # Customer metrics
     total_customers = df['Customer ID'].nunique() if 'Customer ID' in df.columns else 0
-    avg_customer_value = df.groupby('Customer ID')['Sales'].sum().mean() if 'Customer ID' in df.columns else 0
-    repeat_customers = df.groupby('Customer ID')['Order ID'].nunique() if 'Customer ID' in df.columns else pd.Series()
-    repeat_rate = (repeat_customers[repeat_customers > 1].count() / total_customers * 100) if total_customers > 0 else 0
+    avg_customer_value = df.groupby('Customer ID')['Sales'].sum().mean() if 'Customer ID' in df.columns and total_customers > 0 else 0
+    
+    if 'Customer ID' in df.columns:
+        repeat_customers = df.groupby('Customer ID')['Order ID'].nunique()
+        repeat_rate = (repeat_customers[repeat_customers > 1].count() / total_customers * 100) if total_customers > 0 else 0
+        avg_orders = repeat_customers.mean()
+    else:
+        repeat_rate = 0
+        avg_orders = 0
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -1133,113 +1173,120 @@ def render_customer_intelligence(df):
     with col3:
         st.metric("Repeat Rate", f"{repeat_rate:.1f}%")
     with col4:
-        st.metric("Avg Orders/Customer", f"{repeat_customers.mean():.1f}")
+        st.metric("Avg Orders/Customer", f"{avg_orders:.1f}")
     
     st.markdown("---")
     
     # RFM Analysis
     st.subheader("🎯 RFM Customer Segmentation")
     
-    with st.spinner("Calculating RFM scores..."):
-        # Calculate RFM metrics
-        current_date = df['Order Date'].max()
-        
-        rfm = df.groupby('Customer ID').agg({
-            'Order Date': lambda x: (current_date - x.max()).days,
-            'Order ID': 'count',
-            'Sales': 'sum'
-        }).reset_index()
-        
-        rfm.columns = ['Customer ID', 'Recency', 'Frequency', 'Monetary']
-        
-        # Create scores
-        try:
-            rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1], duplicates='drop')
-            rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4], duplicates='drop')
-            rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4], duplicates='drop')
+    if 'Customer ID' in df.columns:
+        with st.spinner("Calculating RFM scores..."):
+            # Calculate RFM metrics
+            current_date = df['Order Date'].max()
             
-            # Convert scores to numeric
-            for col in ['R_Score', 'F_Score', 'M_Score']:
-                rfm[col] = pd.to_numeric(rfm[col])
+            rfm = df.groupby('Customer ID').agg({
+                'Order Date': lambda x: (current_date - x.max()).days,
+                'Order ID': 'count',
+                'Sales': 'sum'
+            }).reset_index()
             
-            rfm['RFM_Score'] = rfm['R_Score'] + rfm['F_Score'] + rfm['M_Score']
+            rfm.columns = ['Customer ID', 'Recency', 'Frequency', 'Monetary']
             
-            # Segment customers
-            def segment_customer(row):
-                if row['RFM_Score'] >= 10:
-                    return 'Champions'
-                elif row['RFM_Score'] >= 8:
-                    return 'Loyal Customers'
-                elif row['RFM_Score'] >= 6:
-                    return 'Potential Loyalists'
-                elif row['RFM_Score'] >= 4:
-                    return 'At Risk'
-                else:
-                    return 'Lost'
-            
-            rfm['Segment'] = rfm.apply(segment_customer, axis=1)
-            
-            # Display RFM visualization
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                # 3D Scatter plot of RFM
-                fig_rfm = px.scatter_3d(
-                    rfm,
-                    x='Recency',
-                    y='Frequency',
-                    z='Monetary',
-                    color='Segment',
-                    hover_name='Customer ID',
-                    title="RFM Analysis - 3D Customer Segmentation",
-                    labels={'Recency': 'Days Since Last Purchase', 
-                           'Frequency': 'Number of Orders',
-                           'Monetary': 'Total Spend ($)'}
-                )
+            # Create scores
+            try:
+                rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1], duplicates='drop')
+                rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4], duplicates='drop')
+                rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4], duplicates='drop')
                 
-                fig_rfm.update_layout(**get_plotly_theme(), height=600)
-                st.plotly_chart(fig_rfm, use_container_width=True)
+                # Convert scores to numeric
+                for col in ['R_Score', 'F_Score', 'M_Score']:
+                    rfm[col] = pd.to_numeric(rfm[col])
                 
-            with col2:
-                st.subheader("Segment Distribution")
+                rfm['RFM_Score'] = rfm['R_Score'] + rfm['F_Score'] + rfm['M_Score']
                 
-                seg_counts = rfm['Segment'].value_counts().reset_index()
-                seg_counts.columns = ['Segment', 'Count']
+                # Segment customers
+                def segment_customer(row):
+                    if row['RFM_Score'] >= 10:
+                        return 'Champions'
+                    elif row['RFM_Score'] >= 8:
+                        return 'Loyal Customers'
+                    elif row['RFM_Score'] >= 6:
+                        return 'Potential Loyalists'
+                    elif row['RFM_Score'] >= 4:
+                        return 'At Risk'
+                    else:
+                        return 'Lost'
                 
-                fig_seg = px.pie(
-                    seg_counts,
-                    values='Count',
-                    names='Segment',
-                    hole=0.4,
-                    color_discrete_sequence=px.colors.qualitative.Set3
-                )
+                rfm['Segment'] = rfm.apply(segment_customer, axis=1)
                 
-                fig_seg.update_layout(**get_plotly_theme(), height=400)
-                st.plotly_chart(fig_seg, use_container_width=True)
+                # Display RFM visualization
+                col1, col2 = st.columns([2, 1])
                 
-                # Segment characteristics
-                st.subheader("Segment Characteristics")
-                seg_stats = rfm.groupby('Segment').agg({
-                    'Recency': 'mean',
-                    'Frequency': 'mean',
-                    'Monetary': 'mean',
-                    'Customer ID': 'count'
-                }).round(1)
-                
-                seg_stats.columns = ['Avg Recency', 'Avg Frequency', 'Avg Spend', 'Count']
-                seg_stats = seg_stats.sort_values('Avg Spend', ascending=False)
-                
-                st.dataframe(
-                    seg_stats.style.format({
-                        'Avg Recency': '{:.0f} days',
-                        'Avg Frequency': '{:.1f}',
-                        'Avg Spend': '${:,.0f}',
-                        'Count': '{:,.0f}'
-                    }),
-                    use_container_width=True
-                )
-        except Exception as e:
-            st.warning(f"RFM Analysis could not be completed: {e}")
+                with col1:
+                    # 3D Scatter plot of RFM
+                    fig_rfm = px.scatter_3d(
+                        rfm,
+                        x='Recency',
+                        y='Frequency',
+                        z='Monetary',
+                        color='Segment',
+                        hover_name='Customer ID',
+                        title="RFM Analysis - 3D Customer Segmentation",
+                        labels={'Recency': 'Days Since Last Purchase', 
+                               'Frequency': 'Number of Orders',
+                               'Monetary': 'Total Spend ($)'}
+                    )
+                    
+                    layout = get_plotly_layout()
+                    layout.update({'height': 600})
+                    fig_rfm.update_layout(layout)
+                    st.plotly_chart(fig_rfm, use_container_width=True)
+                    
+                with col2:
+                    st.subheader("Segment Distribution")
+                    
+                    seg_counts = rfm['Segment'].value_counts().reset_index()
+                    seg_counts.columns = ['Segment', 'Count']
+                    
+                    fig_seg = px.pie(
+                        seg_counts,
+                        values='Count',
+                        names='Segment',
+                        hole=0.4,
+                        color_discrete_sequence=px.colors.qualitative.Set3
+                    )
+                    
+                    layout = get_plotly_layout()
+                    layout.update({'height': 400})
+                    fig_seg.update_layout(layout)
+                    st.plotly_chart(fig_seg, use_container_width=True)
+                    
+                    # Segment characteristics
+                    st.subheader("Segment Characteristics")
+                    seg_stats = rfm.groupby('Segment').agg({
+                        'Recency': 'mean',
+                        'Frequency': 'mean',
+                        'Monetary': 'mean',
+                        'Customer ID': 'count'
+                    }).round(1)
+                    
+                    seg_stats.columns = ['Avg Recency', 'Avg Frequency', 'Avg Spend', 'Count']
+                    seg_stats = seg_stats.sort_values('Avg Spend', ascending=False)
+                    
+                    st.dataframe(
+                        seg_stats.style.format({
+                            'Avg Recency': '{:.0f} days',
+                            'Avg Frequency': '{:.1f}',
+                            'Avg Spend': '${:,.0f}',
+                            'Count': '{:,.0f}'
+                        }),
+                        use_container_width=True
+                    )
+            except Exception as e:
+                st.warning(f"RFM Analysis could not be completed: {e}")
+    else:
+        st.info("Customer ID column not available for RFM analysis")
     
     st.markdown("---")
     
@@ -1249,7 +1296,7 @@ def render_customer_intelligence(df):
     with col1:
         st.subheader("👑 Top 10 Customers by Spend")
         
-        if 'Customer Name' in df.columns:
+        if 'Customer Name' in df.columns and 'Customer ID' in df.columns:
             top_customers = df.groupby('Customer Name').agg({
                 'Sales': 'sum',
                 'Order ID': 'nunique',
@@ -1279,21 +1326,22 @@ def render_customer_intelligence(df):
                 )
             ])
             
-            fig_top.update_layout(
-                **get_plotly_theme(),
-                height=400,
-                yaxis=dict(title='Total Spend ($)', titlefont=dict(color='#38bdf8')),
-                yaxis2=dict(
-                    title='Avg Order Value ($)',
-                    titlefont=dict(color='#f97316'),
-                    tickfont=dict(color='#f97316'),
-                    overlaying='y',
-                    side='right'
-                ),
-                showlegend=True,
-                legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-            )
+            layout = get_plotly_layout()
+            layout.update({
+                'height': 400,
+                'yaxis': {'title': 'Total Spend ($)', 'titlefont': {'color': '#38bdf8'}},
+                'yaxis2': {
+                    'title': 'Avg Order Value ($)',
+                    'titlefont': {'color': '#f97316'},
+                    'tickfont': {'color': '#f97316'},
+                    'overlaying': 'y',
+                    'side': 'right'
+                },
+                'showlegend': True,
+                'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+            })
             
+            fig_top.update_layout(layout)
             st.plotly_chart(fig_top, use_container_width=True)
         else:
             st.info("Customer Name column not available")
@@ -1301,24 +1349,29 @@ def render_customer_intelligence(df):
     with col2:
         st.subheader("📊 Customer Purchase Patterns")
         
-        # Purchase frequency distribution
-        freq_dist = df.groupby('Customer ID')['Order ID'].nunique().value_counts().reset_index()
-        freq_dist.columns = ['Orders', 'Customer Count']
-        freq_dist = freq_dist.sort_values('Orders')
-        
-        fig_freq = px.bar(
-            freq_dist,
-            x='Orders',
-            y='Customer Count',
-            title="Customer Purchase Frequency",
-            labels={'Orders': 'Number of Orders', 'Customer Count': 'Number of Customers'},
-            text='Customer Count'
-        )
-        
-        fig_freq.update_layout(**get_plotly_theme(), height=400)
-        fig_freq.update_traces(textposition='outside')
-        
-        st.plotly_chart(fig_freq, use_container_width=True)
+        if 'Customer ID' in df.columns:
+            # Purchase frequency distribution
+            freq_dist = df.groupby('Customer ID')['Order ID'].nunique().value_counts().reset_index()
+            freq_dist.columns = ['Orders', 'Customer Count']
+            freq_dist = freq_dist.sort_values('Orders')
+            
+            fig_freq = px.bar(
+                freq_dist,
+                x='Orders',
+                y='Customer Count',
+                title="Customer Purchase Frequency",
+                labels={'Orders': 'Number of Orders', 'Customer Count': 'Number of Customers'},
+                text='Customer Count'
+            )
+            
+            layout = get_plotly_layout()
+            layout.update({'height': 400})
+            fig_freq.update_layout(layout)
+            fig_freq.update_traces(textposition='outside')
+            
+            st.plotly_chart(fig_freq, use_container_width=True)
+        else:
+            st.info("Customer ID column not available")
 
 def render_geographic_map(df):
     st.title("🌍 Geographic Analytics")
@@ -1360,18 +1413,19 @@ def render_geographic_map(df):
             labels={color_metric: map_metric}
         )
         
-        fig_map.update_layout(
-            **get_plotly_theme(),
-            height=500,
-            geo=dict(
-                scope='usa',
-                projection=go.layout.geo.Projection(type='albers usa'),
-                showlakes=True,
-                lakecolor='rgba(0,0,0,0)',
-                landcolor='rgba(15, 23, 42, 0.8)'
-            )
-        )
+        layout = get_plotly_layout()
+        layout.update({
+            'height': 500,
+            'geo': {
+                'scope': 'usa',
+                'projection': {'type': 'albers usa'},
+                'showlakes': True,
+                'lakecolor': 'rgba(0,0,0,0)',
+                'landcolor': 'rgba(15, 23, 42, 0.8)'
+            }
+        })
         
+        fig_map.update_layout(layout)
         st.plotly_chart(fig_map, use_container_width=True)
         
     with col2:
@@ -1380,6 +1434,7 @@ def render_geographic_map(df):
         top_states = state_data.nlargest(5, color_metric).reset_index(drop=True)
         
         for idx, row in top_states.iterrows():
+            value_str = format_currency(row[color_metric]) if color_metric in ['Sales', 'Profit'] else f'{row[color_metric]:,.0f}'
             st.markdown(f"""
             <div class="metric-card" style="margin-bottom:10px; padding:15px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1388,7 +1443,7 @@ def render_geographic_map(df):
                         <span style="color:#94a3b8; font-size:0.9rem; margin-left:8px;">#{idx+1}</span>
                     </div>
                     <span style="color:#38bdf8; font-weight:bold;">
-                        {format_currency(row[color_metric]) if color_metric in ['Sales', 'Profit'] else f'{row[color_metric]:,.0f}'}
+                        {value_str}
                     </span>
                 </div>
             </div>
@@ -1421,7 +1476,9 @@ def render_geographic_map(df):
             title="Top 10 Cities by Revenue"
         )
         
-        fig_cities.update_layout(**get_plotly_theme(), height=500)
+        layout = get_plotly_layout()
+        layout.update({'height': 500})
+        fig_cities.update_layout(layout)
         fig_cities.update_traces(textposition='outside')
         
         st.plotly_chart(fig_cities, use_container_width=True)
@@ -1461,22 +1518,23 @@ def render_geographic_map(df):
             textposition='top center'
         ))
         
-        fig_region.update_layout(
-            **get_plotly_theme(),
-            height=500,
-            yaxis=dict(title='Total Sales ($)', titlefont=dict(color='#38bdf8')),
-            yaxis2=dict(
-                title='Profit Margin %',
-                titlefont=dict(color='#4ade80'),
-                tickfont=dict(color='#4ade80'),
-                overlaying='y',
-                side='right',
-                range=[0, max(region_data['Margin']) * 1.2]
-            ),
-            showlegend=True,
-            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-        )
+        layout = get_plotly_layout()
+        layout.update({
+            'height': 500,
+            'yaxis': {'title': 'Total Sales ($)', 'titlefont': {'color': '#38bdf8'}},
+            'yaxis2': {
+                'title': 'Profit Margin %',
+                'titlefont': {'color': '#4ade80'},
+                'tickfont': {'color': '#4ade80'},
+                'overlaying': 'y',
+                'side': 'right',
+                'range': [0, max(region_data['Margin']) * 1.2 if not region_data.empty else 100]
+            },
+            'showlegend': True,
+            'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+        })
         
+        fig_region.update_layout(layout)
         st.plotly_chart(fig_region, use_container_width=True)
 
 def render_export_options(df):

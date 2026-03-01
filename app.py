@@ -202,16 +202,41 @@ avg_order_val = total_sales / total_orders if total_orders else 0
 total_custs   = filtered_df["Customer ID"].nunique()
 avg_shipping  = filtered_df["Shipping_Days"].mean()
 
+# ── KPI metrics that are NOT duplicated in the sidebar Quick Stats ────────────
+# Sidebar already shows: Total Records, Total Sales, Unique Orders, Unique Customers
+# So we show: Avg Order Value, Avg Shipping, YoY Growth, Repeat Rate, Top Category
+
+# YoY growth (most recent two years in the filtered set)
+yoy_growth_val = "N/A"
+yoy_growth_sub = "insufficient data"
+years_avail = sorted(filtered_df["Year"].unique())
+if len(years_avail) >= 2:
+    s_curr = filtered_df[filtered_df["Year"] == years_avail[-1]]["Sales"].sum()
+    s_prev = filtered_df[filtered_df["Year"] == years_avail[-2]]["Sales"].sum()
+    if s_prev > 0:
+        pct = (s_curr - s_prev) / s_prev * 100
+        yoy_growth_val = f"{'+' if pct >= 0 else ''}{pct:.1f}%"
+        yoy_growth_sub = f"{years_avail[-2]} → {years_avail[-1]}"
+
+# Repeat customer rate (customers with more than 1 order)
+repeat_mask = filtered_df.groupby("Customer ID")["Order ID"].nunique() > 1
+repeat_rate = repeat_mask.mean() * 100
+repeat_sub  = f"{repeat_mask.sum():,} of {total_custs:,} customers"
+
+# Top category by sales
+top_cat     = filtered_df.groupby("Category")["Sales"].sum().idxmax()
+top_cat_pct = filtered_df.groupby("Category")["Sales"].sum().max() / total_sales * 100
+
 kpi_data = [
-    ("Total Sales",      f"${total_sales:,.0f}",       "$",  "#4299e1", "↑ Revenue"),
-    ("Total Orders",     f"{total_orders:,}",           "📦", "#48bb78", "Unique orders"),
-    ("Avg Order Value",  f"${avg_order_val:,.0f}",      "$",  "#ed8936", "Per order"),
-    ("Unique Customers", f"{total_custs:,}",            "👤", "#9f7aea", "Buyers"),
-    ("Avg Shipping",     f"{avg_shipping:.1f} days",    "🚚", "#38b2ac", "Fulfillment"),
+    ("Avg Order Value",    f"${avg_order_val:,.0f}",       "#ed8936", "Per transaction"),
+    ("Avg Shipping",       f"{avg_shipping:.1f} days",     "#38b2ac", "Order-to-ship"),
+    ("YoY Sales Growth",   yoy_growth_val,                 "#48bb78" if "+" in yoy_growth_val else "#fc8181", yoy_growth_sub),
+    ("Repeat Buyer Rate",  f"{repeat_rate:.1f}%",          "#9f7aea", repeat_sub),
+    ("Top Category",       top_cat,                        "#4299e1", f"{top_cat_pct:.1f}% of revenue"),
 ]
 
 cols = st.columns(5)
-for col, (label, val, icon, color, sub) in zip(cols, kpi_data):
+for col, (label, val, color, sub) in zip(cols, kpi_data):
     with col:
         st.markdown(f"""
         <div style="
@@ -219,10 +244,7 @@ for col, (label, val, icon, color, sub) in zip(cols, kpi_data):
             border-radius: 4px 4px 12px 12px;
             background: linear-gradient(160deg, #0d1b2a 0%, #111e2e 100%);
             padding: 18px 20px 14px;
-            position: relative;
-            overflow: hidden;
         ">
-            <div style="position:absolute;top:10px;right:14px;font-size:1.6rem;opacity:0.12;">{icon}</div>
             <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.12em;
                         text-transform:uppercase;color:{color};margin-bottom:10px;">{label}</div>
             <div style="font-size:1.75rem;font-weight:800;color:#f7fafc;

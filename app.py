@@ -6,7 +6,6 @@ import numpy as np
 from datetime import datetime
 import warnings
 
-# Ignore warnings for cleaner output
 warnings.filterwarnings("ignore")
 
 # ── Page Configuration ────────────────────────────────────────────────────────
@@ -20,18 +19,13 @@ st.set_page_config(
 # ── Custom CSS & Theme ────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Global Background */
     .stApp {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         color: #f8fafc;
     }
-    
-    /* Hide Streamlit Branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-
-    /* Cards */
     .metric-card {
         background: rgba(30, 41, 59, 0.7);
         backdrop-filter: blur(10px);
@@ -51,8 +45,6 @@ st.markdown("""
     .metric-value { font-size: 1.8rem; font-weight: 700; color: #f1f5f9; margin-top: 5px; }
     .metric-delta { font-size: 0.8rem; color: #4ade80; margin-top: 5px; font-weight: 600; }
     .metric-delta.neg { color: #f87171; }
-
-    /* Insight Cards */
     .insight-box {
         background: rgba(15, 23, 42, 0.6);
         border-left: 4px solid #38bdf8;
@@ -63,8 +55,6 @@ st.markdown("""
     .insight-box.warn { border-left-color: #fbbf24; }
     .insight-box.danger { border-left-color: #f87171; }
     .insight-box.good { border-left-color: #4ade80; }
-    
-    /* Revenue Intelligence Card */
     .revenue-card {
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         border: 1px solid rgba(159, 122, 234, 0.3);
@@ -83,14 +73,10 @@ st.markdown("""
         border-bottom: 1px solid rgba(159, 122, 234, 0.2);
         padding-bottom: 10px;
     }
-    
-    /* Scrollbar */
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    
-    /* Plotly Overrides */
     .js-plotly-plot .plotly .modebar { background: rgba(30, 41, 59, 0.5) !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -100,29 +86,21 @@ st.markdown("""
 @st.cache_data(ttl=3600)
 def load_data():
     try:
-        # Ensure this file exists in your directory
         df = pd.read_csv('cleaned_train.csv')
-        
-        # Ensure date columns are datetime
         df['Order Date'] = pd.to_datetime(df['Order Date'])
         df['Ship Date'] = pd.to_datetime(df['Ship Date'])
-        
-        # Feature Engineering
         df['Year'] = df['Order Date'].dt.year
         df['Month'] = df['Order Date'].dt.month
         df['Month_Name'] = df['Order Date'].dt.month_name()
         df['DayOfWeek'] = df['Order Date'].dt.day_name()
         df['Shipping_Days'] = (df['Ship Date'] - df['Order Date']).dt.days
         
-        # Check for Profit column (Standard Superstore dataset has it)
         if 'Profit' not in df.columns:
-            # Fallback simulation if missing
-            df['Profit'] = df['Sales'] * 0.25 
+            df['Profit'] = df['Sales'] * 0.25
             df['Profit Margin'] = 25.0
         else:
             df['Profit Margin'] = (df['Profit'] / df['Sales']) * 100
         
-        # State Abbreviations
         us_state_to_abbrev = {
             "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
             "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
@@ -141,17 +119,16 @@ def load_data():
         st.error(f"Critical Error Loading Data: {e}")
         return pd.DataFrame()
 
+# ✅ FIXED: Return layout properties directly (not nested under 'layout' key)
 def get_plotly_theme():
     return {
-        'layout': {
-            'font': {'color': '#94a3b8', 'family': 'Inter, sans-serif'},
-            'plot_bgcolor': 'rgba(0,0,0,0)',
-            'paper_bgcolor': 'rgba(0,0,0,0)',
-            'xaxis': {'gridcolor': '#1e293b', 'linecolor': '#1e293b'},
-            'yaxis': {'gridcolor': '#1e293b', 'linecolor': '#1e293b'},
-            'hovermode': 'x unified',
-            'hoverlabel': {'bgcolor': '#0f172a', 'font_color': '#f8fafc', 'bordercolor': '#334155'}
-        }
+        'font': {'color': '#94a3b8', 'family': 'Inter, sans-serif'},
+        'plot_bgcolor': 'rgba(0,0,0,0)',
+        'paper_bgcolor': 'rgba(0,0,0,0)',
+        'xaxis': {'gridcolor': '#1e293b', 'linecolor': '#1e293b'},
+        'yaxis': {'gridcolor': '#1e293b', 'linecolor': '#1e293b'},
+        'hovermode': 'x unified',
+        'hoverlabel': {'bgcolor': '#0f172a', 'font_color': '#f8fafc', 'bordercolor': '#334155'}
     }
 
 # ── Render Functions ──────────────────────────────────────────────────────────
@@ -160,8 +137,6 @@ def render_sidebar(df):
     with st.sidebar:
         st.title("🎛️ Control Center")
         st.markdown("---")
-        
-        # Navigation
         st.markdown("### 🧭 Navigation")
         nav_selection = st.radio(
             "Go to",
@@ -169,8 +144,6 @@ def render_sidebar(df):
             label_visibility="collapsed"
         )
         st.markdown("---")
-
-        # Filters
         st.markdown("### 🔍 Filters")
         
         min_date = df['Order Date'].min()
@@ -207,7 +180,6 @@ def apply_filters(df, date_range, regions, categories, segments):
     return df[mask].copy()
 
 def render_revenue_intelligence(df):
-    """Refined version of the original Revenue Intelligence Card"""
     subcat_stats = df.groupby('Sub-Category').agg({'Sales': 'sum', 'Order ID': 'nunique'}).reset_index()
     if subcat_stats.empty:
         return
@@ -222,7 +194,6 @@ def render_revenue_intelligence(df):
     vol_per_order = float(top_volume_sub['Sales'])  / float(top_volume_sub['Order ID'])
     multiplier = rev_per_order / vol_per_order if vol_per_order > 0 else 0
     
-    # Avoid division by zero or identical items
     if rev_name == vol_name:
         insight_text = f"**{rev_name}** dominates both revenue and volume."
     else:
@@ -253,7 +224,6 @@ def render_overview(df):
     st.title("📊 Executive Overview")
     st.markdown(f"*Real-time analysis of **{len(df):,}** transactions.*")
     
-    # KPIs
     total_sales = df['Sales'].sum()
     total_profit = df['Profit'].sum()
     total_orders = df['Order ID'].nunique()
@@ -301,7 +271,6 @@ def render_overview(df):
 
     st.markdown("---")
     
-    # Main Charts Row
     col1, col2 = st.columns([2, 1])
     
     with col1:
@@ -322,7 +291,6 @@ def render_overview(df):
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    # Revenue Intelligence Section
     st.markdown("### 💡 Strategic Insights")
     render_revenue_intelligence(df)
 
@@ -334,7 +302,6 @@ def render_sales_analysis(df):
     with tab1:
         col1, col2 = st.columns(2)
         with col1:
-            # Heatmap of Sales by Day/Month
             pivot_df = df.pivot_table(values='Sales', index='Month_Name', columns='DayOfWeek', aggfunc='sum')
             day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
             pivot_df = pivot_df.reindex(columns=[d for d in day_order if d in pivot_df.columns])
@@ -363,7 +330,6 @@ def render_sales_analysis(df):
 def render_product_insights(df):
     st.title("📦 Product Intelligence")
     
-    # Top Products
     subcat_df = df.groupby('Sub-Category').agg({'Sales': 'sum', 'Profit': 'sum', 'Order ID': 'nunique'}).reset_index()
     subcat_df['Profit Margin'] = (subcat_df['Profit'] / subcat_df['Sales']) * 100
     subcat_df = subcat_df.sort_values('Sales', ascending=False).head(15)
@@ -399,7 +365,6 @@ def render_product_insights(df):
 def render_customer_intelligence(df):
     st.title("👥 Customer 360")
     
-    # RFM Analysis Simulation
     rfm = df.groupby('Customer ID').agg({
         'Order Date': 'max',
         'Order ID': 'count',
@@ -409,11 +374,10 @@ def render_customer_intelligence(df):
     rfm.columns = ['Customer ID', 'LastPurchase', 'Frequency', 'Monetary']
     rfm['Recency'] = (datetime.now() - rfm['LastPurchase']).dt.days
     
-    # Simple Segmentation with error handling for qcut
     try:
-        rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1])
-        rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4])
-        rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4])
+        rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=[4, 3, 2, 1], duplicates='drop')
+        rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=[1, 2, 3, 4], duplicates='drop')
+        rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=[1, 2, 3, 4], duplicates='drop')
         
         rfm['Segment'] = rfm['R_Score'].astype(int) + rfm['F_Score'].astype(int) + rfm['M_Score'].astype(int)
         
@@ -447,7 +411,7 @@ def render_geographic_map(df):
         fig_map = px.choropleth(state_data, locations='State Code', locationmode="USA-states",
                                 color='Sales', scope="usa", hover_name='State',
                                 color_continuous_scale='Blues', title="Sales Density by State")
-        fig_map.update_layout(**get_plotly_theme(), height=500, geo=dict(scope='usa', projection=go.layout.geo.Projection(type='albers usa')))
+        fig_map.update_layout(**get_plotly_theme(), height=500)
         st.plotly_chart(fig_map, use_container_width=True)
         
     with col2:
@@ -476,12 +440,10 @@ def render_download(df):
 # ── Main Application ──────────────────────────────────────────────────────────
 
 def main():
-    # Load Data
     df = load_data()
     if df.empty:
         st.stop()
 
-    # Sidebar & Filters
     nav_selection, date_range, regions, categories, segments = render_sidebar(df)
     filtered_df = apply_filters(df, date_range, regions, categories, segments)
 
@@ -489,8 +451,6 @@ def main():
         st.warning("⚠️ No data matches your filters. Please reset filters.")
         st.stop()
 
-    # ── Render Content Based on Navigation ────────────────────────────────────
-    
     if nav_selection == "Overview":
         render_overview(filtered_df)
     elif nav_selection == "Sales Analysis":
@@ -502,7 +462,6 @@ def main():
     elif nav_selection == "Geographic Map":
         render_geographic_map(filtered_df)
 
-    # Download Button (Always visible at bottom)
     render_download(filtered_df)
     
     st.markdown("---")
@@ -510,4 +469,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# END OF CODE

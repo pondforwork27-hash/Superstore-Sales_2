@@ -218,10 +218,12 @@ if len(years_avail) >= 2:
         yoy_growth_val = f"{'+' if pct >= 0 else ''}{pct:.1f}%"
         yoy_growth_sub = f"{years_avail[-2]} → {years_avail[-1]}"
 
-# Repeat customer rate (customers with more than 1 order)
-repeat_mask = filtered_df.groupby("Customer ID")["Order ID"].nunique() > 1
-repeat_rate = repeat_mask.mean() * 100
-repeat_sub  = f"{repeat_mask.sum():,} of {total_custs:,} customers"
+# Avg orders per customer (more meaningful than repeat rate which is ~98% for this dataset)
+avg_orders_per_cust = total_orders / total_custs if total_custs else 0
+orders_per_cust_series = filtered_df.groupby("Customer ID")["Order ID"].nunique()
+top_10_pct_threshold = orders_per_cust_series.quantile(0.90)
+heavy_buyers = (orders_per_cust_series >= top_10_pct_threshold).sum()
+orders_sub = f"top 10%: {heavy_buyers:,} customers ≥{int(top_10_pct_threshold)} orders"
 
 # Top category by sales
 top_cat     = filtered_df.groupby("Category")["Sales"].sum().idxmax()
@@ -231,7 +233,7 @@ kpi_data = [
     ("Avg Order Value",    f"${avg_order_val:,.0f}",       "#ed8936", "Per transaction"),
     ("Avg Shipping",       f"{avg_shipping:.1f} days",     "#38b2ac", "Order-to-ship"),
     ("YoY Sales Growth",   yoy_growth_val,                 "#48bb78" if "+" in yoy_growth_val else "#fc8181", yoy_growth_sub),
-    ("Repeat Buyer Rate",  f"{repeat_rate:.1f}%",          "#9f7aea", repeat_sub),
+    ("Avg Orders / Customer", f"{avg_orders_per_cust:.1f}",          "#9f7aea", orders_sub),
     ("Top Category",       top_cat,                        "#4299e1", f"{top_cat_pct:.1f}% of revenue"),
 ]
 

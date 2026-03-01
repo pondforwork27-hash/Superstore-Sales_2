@@ -413,19 +413,61 @@ with col1:
 
         '</div>'
 
-        # opportunity callout
-        '<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;'
-        'background:rgba(255,255,255,0.025);border-radius:10px;border-left:3px solid rgba(159,122,234,0.5);">'
-        '<span style="font-size:1rem;flex-shrink:0;margin-top:1px;">&#127919;</span>'
+        # actionable playbook
+        '<div style="background:rgba(255,255,255,0.025);border-radius:12px;overflow:hidden;">'
+
+        # playbook header
+        '<div style="padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.06);'
+        'display:flex;align-items:center;justify-content:space-between;">'
+        '<span style="font-size:0.62rem;font-weight:800;letter-spacing:0.16em;color:#b794f4;text-transform:uppercase;">&#127919; Action Playbook</span>'
+        '<span style="font-size:0.6rem;color:#4a5568;">3 steps to ' + untapped_fmt + ' upside</span>'
+        '</div>'
+
+        # step 1
+        '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.04);">'
+        '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(159,122,234,0.2);'
+        'border:1px solid rgba(159,122,234,0.5);display:flex;align-items:center;justify-content:center;'
+        'font-size:0.65rem;font-weight:800;color:#b794f4;">1</div>'
         '<div>'
-        '<span style="font-size:0.68rem;font-weight:700;color:#b794f4;text-transform:uppercase;letter-spacing:0.1em;">Opportunity</span>'
-        '<div style="font-size:0.76rem;color:#90cdf4;margin-top:3px;line-height:1.5;">'
-        'Pairing <strong style="color:#e9d8fd;">' + vol_name + '</strong>\'s order frequency with '
-        '<strong style="color:#e9d8fd;">' + rev_name + '</strong>\'s ticket price could unlock an estimated '
-        '<strong style="color:#faf089;">' + untapped_fmt + '</strong> in incremental revenue &#8212; '
-        'without acquiring a single new customer.'
+        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Bundle at checkout</div>'
+        '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
+        'Surface <strong style="color:#c9b8f5;">' + rev_name + '</strong> as an add-on when '
+        '<strong style="color:#90cdf4;">' + vol_name + '</strong> hits the cart. '
+        'Even a 5% attach rate adds meaningful revenue per campaign cycle.'
         '</div>'
         '</div>'
+        '</div>'
+
+        # step 2
+        '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,0.04);">'
+        '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(66,153,225,0.2);'
+        'border:1px solid rgba(66,153,225,0.5);display:flex;align-items:center;justify-content:center;'
+        'font-size:0.65rem;font-weight:800;color:#63b3ed;">2</div>'
+        '<div>'
+        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Target repeat buyers first</div>'
+        '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
+        'Filter customers with 3+ <strong style="color:#90cdf4;">' + vol_name + '</strong> orders — '
+        'they\'re already loyal. Send a targeted offer for <strong style="color:#c9b8f5;">' + rev_name + '</strong> '
+        'with a time-limited discount to drive first-time trial.'
+        '</div>'
+        '</div>'
+        '</div>'
+
+        # step 3
+        '<div style="display:flex;align-items:flex-start;gap:12px;padding:11px 14px;">'
+        '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:rgba(72,187,120,0.2);'
+        'border:1px solid rgba(72,187,120,0.5);display:flex;align-items:center;justify-content:center;'
+        'font-size:0.65rem;font-weight:800;color:#68d391;">3</div>'
+        '<div>'
+        '<div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;margin-bottom:2px;">Measure cross-sell rate monthly</div>'
+        '<div style="font-size:0.7rem;color:#718096;line-height:1.45;">'
+        'Track the % of <strong style="color:#90cdf4;">' + vol_name + '</strong> buyers who also purchase '
+        '<strong style="color:#c9b8f5;">' + rev_name + '</strong> within 30 days. '
+        'Set a baseline this month, then A/B test placement and messaging quarterly.'
+        '</div>'
+        '</div>'
+        '</div>'
+
         '</div>'
 
         '</div></div>'
